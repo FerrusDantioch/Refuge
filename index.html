@@ -242,11 +242,11 @@
     <div class="carte">
       <h2>Ce que fait le bouton d'aide</h2>
       <label class="interrupteur" for="r-ouvrir-sms">
-        <span>Préparer le SMS pour mon contact</span>
+        <span>Proposer d'envoyer le SMS à mon contact</span>
         <input type="checkbox" id="r-ouvrir-sms" checked>
       </label>
       <label class="interrupteur" for="r-afficher-carte">
-        <span>Afficher le message en grand sur l'écran</span>
+        <span>Afficher aussi le message en grand</span>
         <input type="checkbox" id="r-afficher-carte" checked>
       </label>
       <label class="interrupteur" for="r-bouclier-auto">
@@ -294,8 +294,10 @@
 <!-- ====== Carte de communication plein écran ====== -->
 <div id="carte-sos" class="carte-sos" hidden role="dialog" aria-modal="true" aria-label="Message à montrer">
   <p class="message" id="sos-message"></p>
+  <p class="avis masque" id="sos-avertissement"></p>
   <div class="pied">
-    <button type="button" id="sos-appeler" class="bouton-doux masque" style="margin-bottom:12px"></button>
+    <button type="button" id="sos-envoyer" class="bouton-doux masque" style="margin-bottom:12px"></button>
+    <button type="button" id="sos-appeler" class="masque" style="margin-bottom:12px"></button>
     <button type="button" id="sos-contraste" style="margin-bottom:12px" aria-pressed="false">
       Éclaircir pour le montrer
     </button>

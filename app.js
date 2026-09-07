@@ -165,46 +165,69 @@ function ouvrirSms() {
   window.location.href = url;
 }
 
-function afficherCarteSos() {
+/* La carte de communication a deux usages opposés, donc deux apparences :
+
+   - « J'ai besoin d'aide » : elle est POUR VOUS. Elle affiche le message et
+     les deux actions possibles, envoyer le SMS et appeler.
+   - « Montrer un message » : elle est POUR LES AUTRES. Vous tendez votre
+     téléphone à quelqu'un : aucune action n'y figure, personne ne peut
+     déclencher un appel par mégarde. */
+function afficherCarteSos(avecActions) {
   $('#sos-message').textContent = remplir(reglages.messageCarte);
 
-  const btnAppel = $('#sos-appeler');
-  if (numeroPropre(reglages.tel)) {
-    btnAppel.textContent = 'Appeler ' + (reglages.nom || 'mon contact');
-    btnAppel.classList.remove('masque');
+  const tel = numeroPropre(reglages.tel);
+  const nom = reglages.nom || 'mon contact';
+  const btnEnvoi  = $('#sos-envoyer');
+  const btnAppel  = $('#sos-appeler');
+
+  const montrerEnvoi = avecActions && tel && reglages.aideOuvreSms;
+  const montrerAppel = avecActions && tel;
+
+  btnEnvoi.textContent = 'Envoyer le SMS à ' + nom;
+  btnEnvoi.classList.toggle('masque', !montrerEnvoi);
+  btnAppel.textContent = 'Appeler ' + nom;
+  btnAppel.classList.toggle('masque', !montrerAppel);
+
+  /* Sans numéro enregistré, on le dit ICI : le rappel de l'écran d'accueil
+     serait caché derrière cette carte, donc invisible. */
+  const avert = $('#sos-avertissement');
+  if (avecActions && !tel) {
+    avert.textContent = "Aucun contact d'urgence n'est enregistré. "
+      + "Ouvrez l'onglet Réglages pour en ajouter un.";
+    avert.classList.remove('masque');
   } else {
-    btnAppel.classList.add('masque');
+    avert.classList.add('masque');
   }
 
   $('#carte-sos').hidden = false;
-  $('#sos-fermer').focus();
-  annoncer('Message affiché en grand.');
+  (montrerEnvoi ? btnEnvoi : $('#sos-fermer')).focus();
+  annoncer(avecActions ? 'Message affiché, avec les actions.' : 'Message affiché en grand.');
 }
 
+/* Pourquoi l'application Messages ne s'ouvre PAS toute seule :
+   Android n'autorise une application à en ouvrir une autre que dans
+   l'instant qui suit l'appui du doigt. Une version précédente attendait
+   400 ms pour laisser la carte s'afficher d'abord — et Android refusait
+   l'ouverture, silencieusement. Un bouton explicite est non seulement
+   fiable, il est aussi plus juste : vous voyez le message avant qu'il
+   parte, et rien ne s'envoie sans que vous l'ayez décidé. */
 $('#btn-aide').addEventListener('click', () => {
   if (reglages.aideActiveBouclier && !bouclierActif) activerBouclier(true);
-  if (reglages.aideAfficheCarte) afficherCarteSos();
-
-  if (reglages.aideOuvreSms) {
-    if (!numeroPropre(reglages.tel)) {
-      $('#rappel-reglages').classList.remove('masque');
-      annoncer("Aucun numéro enregistré. Rendez-vous dans les réglages.");
-      return;
-    }
-    /* Petit délai : la carte a le temps de s'afficher avant que le
-       téléphone ne bascule vers l'application SMS. En revenant,
-       le message est donc déjà là, sans rien avoir à refaire. */
-    setTimeout(ouvrirSms, reglages.aideAfficheCarte ? 400 : 0);
-  }
+  afficherCarteSos(true);
 });
 
-$('#btn-carte').addEventListener('click', afficherCarteSos);
+$('#btn-carte').addEventListener('click', () => afficherCarteSos(false));
+
+/* L'ouverture se fait dans l'instant même de l'appui : aucune attente,
+   aucun calcul avant. C'est la condition pour qu'Android l'accepte. */
+$('#sos-envoyer').addEventListener('click', ouvrirSms);
 $('#sos-fermer').addEventListener('click', () => {
   const carte = $('#carte-sos');
   carte.hidden = true;
   carte.classList.remove('contraste-fort');
   $('#sos-contraste').setAttribute('aria-pressed', 'false');
   $('#sos-contraste').textContent = 'Éclaircir pour le montrer';
+  $('#sos-avertissement').classList.add('masque');
   $('#btn-aide').focus();
 });
 $('#sos-appeler').addEventListener('click', () => {
