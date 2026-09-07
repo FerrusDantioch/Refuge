@@ -676,6 +676,23 @@ function majBoutonAide() {
   $('#rappel-reglages').classList.toggle('masque', !!numeroPropre(reglages.tel));
 }
 
+/* Affiche un message sous le bouton « Choisir dans mes contacts ».
+   Le paragraphe est créé à la volée : rien à ajouter dans index.html. */
+function messageContact(texte) {
+  const btn = $('#btn-choisir-contact');
+  if (!btn) return;
+  let p = document.getElementById('msg-contact');
+  if (!texte) { if (p) p.remove(); return; }
+  if (!p) {
+    p = document.createElement('p');
+    p.id = 'msg-contact';
+    p.className = 'avis';
+    p.setAttribute('role', 'status');
+    btn.insertAdjacentElement('afterend', p);
+  }
+  p.textContent = texte;
+}
+
 function initReglages() {
   lierTexte('#r-nom', 'nom');
   lierTexte('#r-tel', 'tel');
@@ -704,21 +721,42 @@ function initReglages() {
     annoncer("Textes d'origine rétablis.");
   });
 
-  /* Sélecteur de contacts : disponible sur Chrome Android en HTTPS.
-     S'il n'existe pas, on n'affiche simplement pas le bouton. */
+  /* --- Sélecteur de contacts du téléphone ---
+     Cette fonction n'existe que sur Chrome Android, et uniquement sur une
+     page ouverte en plein écran (jamais dans un aperçu intégré à une autre
+     page). Quand elle échoue, le bouton doit le DIRE : un bouton muet est
+     un bouton cassé. La saisie à la main reste toujours possible. */
   if ('contacts' in navigator && 'ContactsManager' in window) {
     const btn = $('#btn-choisir-contact');
     btn.classList.remove('masque');
+
     btn.addEventListener('click', async () => {
+      messageContact('');
       try {
-        const [contact] = await navigator.contacts.select(['name', 'tel'], { multiple: false });
-        if (!contact) return;
+        const resultat = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+
+        /* Liste refermée sans rien choisir : ce n'est pas une erreur. */
+        if (!resultat || resultat.length === 0) return;
+        const contact = resultat[0];
+
         if (contact.name && contact.name[0]) { reglages.nom = contact.name[0]; $('#r-nom').value = reglages.nom; }
         if (contact.tel  && contact.tel[0])  { reglages.tel = contact.tel[0];  $('#r-tel').value = reglages.tel; }
         sauverReglages();
         majBoutonAide();
+
+        if (!contact.tel || !contact.tel[0]) {
+          messageContact("Ce contact n'a pas de numéro enregistré. Saisissez-le à la main ci-dessus.");
+        } else {
+          messageContact('Contact repris : ' + (reglages.nom || 'sans nom') + ' — ' + reglages.tel);
+        }
       } catch (e) {
-        console.warn('Sélection de contact annulée.', e);
+        /* L'utilisateur a fermé la liste lui-même : on ne dit rien. */
+        if (e && e.name === 'AbortError') return;
+        messageContact(
+          "Votre navigateur refuse l'accès aux contacts ici. Saisissez le nom et le "
+          + "numéro à la main juste au-dessus : l'application fonctionnera exactement "
+          + "pareil. (Code technique : " + ((e && e.name) || 'inconnu') + ")");
+        console.warn('Sélecteur de contacts indisponible.', e);
       }
     });
   }
