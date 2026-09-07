@@ -1,0 +1,52 @@
+{
+  "name": "Refuge — aide en crise sensorielle",
+  "short_name": "Refuge",
+  "description": "Un refuge sensoriel de poche : appel à l'aide sans parler, bouclier sensoriel, respiration guidée et journal de crises.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#171b21",
+  "theme_color": "#171b21",
+  "categories": [
+    "health",
+    "lifestyle",
+    "medical"
+  ],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Bouclier sensoriel",
+      "short_name": "Bouclier",
+      "description": "Ouvrir directement en mode noir absolu",
+      "url": "./index.html?mode=bouclier"
+    },
+    {
+      "name": "Respiration",
+      "short_name": "Respirer",
+      "description": "Ouvrir le guide de respiration",
+      "url": "./index.html?vue=respiration"
+    }
+  ]
+}

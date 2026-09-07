@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="sombre">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Refuge</title>
+<meta name="description" content="Un refuge sensoriel de poche pour les crises de surcharge.">
+<meta name="theme-color" content="#171b21">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<!-- ====== Zone des messages pour lecteurs d'écran ====== -->
+<p id="annonce" class="annonce" role="status" aria-live="polite"></p>
+
+<main>
+
+  <!-- ========================================================
+       VUE 1 — ACCUEIL (mode crise, priorité absolue)
+       ======================================================== -->
+  <section id="vue-accueil" class="vue active" role="tabpanel" aria-labelledby="onglet-accueil">
+
+    <button id="btn-aide" class="bouton-aide">
+      J'AI BESOIN D'AIDE
+      <span class="sous" id="btn-aide-sous">Prévenir mon contact</span>
+    </button>
+
+    <div class="bouton-rangee" style="margin-bottom:16px">
+      <button id="btn-bouclier" class="bouton-doux" aria-pressed="false">
+        Bouclier sensoriel
+      </button>
+      <button id="btn-carte" class="bouton-doux">
+        Montrer un message
+      </button>
+    </div>
+
+    <button id="btn-respirer-vite" style="margin-bottom:16px">Respirer avec moi</button>
+
+    <!-- Guides affichés uniquement quand le bouclier est actif -->
+    <div id="guides-bouclier" class="carte masque">
+      <h2>Vous êtes en sécurité. Trois gestes.</h2>
+
+      <div class="guide">
+        <h3>1. Baisser la lumière</h3>
+        <p>Faites glisser votre doigt du haut de l'écran vers le bas, deux fois.
+           Une barre de luminosité apparaît. Poussez-la vers la gauche, au minimum.</p>
+      </div>
+
+      <div class="guide">
+        <h3>2. Faire taire le téléphone</h3>
+        <p>Dans le même panneau, touchez l'icône en forme de croissant de lune,
+           « Ne pas déranger ». Les notifications s'arrêtent.</p>
+      </div>
+
+      <div class="guide">
+        <h3>3. Respirer</h3>
+        <p>Rien d'autre n'est urgent. Restez ici aussi longtemps qu'il le faut.</p>
+      </div>
+
+      <p><small>L'application est désormais totalement silencieuse : aucun son,
+         aucune vibration, aucune notification ne viendra d'elle.</small></p>
+    </div>
+
+    <p id="rappel-reglages" class="avis masque">
+      Aucun contact d'urgence n'est encore enregistré.
+      Ouvrez l'onglet <strong>Réglages</strong> pour en ajouter un, à tête reposée.
+    </p>
+
+  </section>
+
+  <!-- ========================================================
+       VUE 2 — JOURNAL DE CRISES
+       ======================================================== -->
+  <section id="vue-journal" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-journal" hidden>
+    <h1>Journal</h1>
+
+    <button id="btn-nouvelle" class="bouton-doux" style="margin-bottom:18px">
+      Enregistrer une crise
+    </button>
+
+    <!-- Formulaire d'ajout, masqué par défaut -->
+    <form id="form-crise" class="carte masque" novalidate>
+      <h2>Nouvelle entrée</h2>
+
+      <label for="f-date">Date et heure</label>
+      <input type="datetime-local" id="f-date" required>
+
+      <label for="f-duree">Durée</label>
+      <div class="choix" id="f-duree" role="group" aria-label="Durée de la crise">
+        <button type="button" data-val="5">5 min</button>
+        <button type="button" data-val="15">15 min</button>
+        <button type="button" data-val="30">30 min</button>
+        <button type="button" data-val="60">1 h</button>
+        <button type="button" data-val="120">2 h +</button>
+      </div>
+
+      <label for="f-intensite">Intensité ressentie</label>
+      <div class="choix" id="f-intensite" role="group" aria-label="Intensité de 1 à 5">
+        <button type="button" data-val="1" aria-label="1 sur 5, très légère">1</button>
+        <button type="button" data-val="2" aria-label="2 sur 5">2</button>
+        <button type="button" data-val="3" aria-label="3 sur 5">3</button>
+        <button type="button" data-val="4" aria-label="4 sur 5">4</button>
+        <button type="button" data-val="5" aria-label="5 sur 5, très forte">5</button>
+      </div>
+
+      <label>Déclencheurs</label>
+      <div class="choix" id="f-declencheurs" role="group" aria-label="Déclencheurs possibles">
+        <button type="button" data-val="Bruit">Bruit</button>
+        <button type="button" data-val="Lumière">Lumière</button>
+        <button type="button" data-val="Foule">Foule</button>
+        <button type="button" data-val="Odeur">Odeur</button>
+        <button type="button" data-val="Contact physique">Contact</button>
+        <button type="button" data-val="Imprévu">Imprévu</button>
+        <button type="button" data-val="Fatigue">Fatigue</button>
+        <button type="button" data-val="Interaction sociale">Social</button>
+        <button type="button" data-val="Transport">Transport</button>
+      </div>
+
+      <label for="f-note">Autre chose à noter (facultatif)</label>
+      <textarea id="f-note" placeholder="Ce que je ressentais, ce qui a aidé…"></textarea>
+
+      <div class="bouton-rangee">
+        <button type="button" id="btn-annuler">Annuler</button>
+        <button type="submit" class="bouton-doux">Enregistrer</button>
+      </div>
+    </form>
+
+    <div id="liste-crises"></div>
+
+    <div id="outils-journal" class="carte masque">
+      <h3>Mes données</h3>
+      <p><small>Tout est stocké uniquement sur ce téléphone. Rien n'est envoyé
+         sur internet. Vous pouvez exporter une copie pour vous, ou pour la
+         montrer à un professionnel.</small></p>
+      <div class="bouton-rangee">
+        <button type="button" id="btn-export-csv">Exporter (CSV)</button>
+        <button type="button" id="btn-export-json">Sauvegarde (JSON)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       VUE 3 — RESPIRATION
+       ======================================================== -->
+  <section id="vue-respiration" class="vue" role="tabpanel" aria-labelledby="onglet-respiration" hidden>
+    <h1>Respiration</h1>
+
+    <div class="scene-respiration">
+      <div id="cercle" class="cercle" aria-hidden="true"></div>
+    </div>
+
+    <p id="consigne" class="consigne">Quand vous voulez</p>
+    <p id="compteur" class="compteur">&nbsp;</p>
+
+    <button id="btn-respi" class="bouton-doux" style="margin-bottom:20px">Commencer</button>
+
+    <div class="carte">
+      <h3>Rythme</h3>
+      <div class="choix" id="choix-rythme" role="group" aria-label="Choix du rythme">
+        <button type="button" data-preset="coherence" aria-pressed="true">Cohérence 5-5</button>
+        <button type="button" data-preset="apaisant">Apaisant 4-7-8</button>
+        <button type="button" data-preset="carre">Carré 4-4-4-4</button>
+      </div>
+      <p id="desc-rythme"><small>Inspirer 5 secondes, expirer 5 secondes.
+         Le rythme de la cohérence cardiaque : c'est celui qui apaise le plus
+         vite le système nerveux.</small></p>
+
+      <h3>Durée</h3>
+      <div class="choix" id="choix-duree" role="group" aria-label="Durée de la séance">
+        <button type="button" data-min="1">1 min</button>
+        <button type="button" data-min="3" aria-pressed="true">3 min</button>
+        <button type="button" data-min="5">5 min</button>
+        <button type="button" data-min="10">10 min</button>
+        <button type="button" data-min="0">Sans fin</button>
+      </div>
+    </div>
+
+    <p><small>Si suivre le cercle demande trop d'effort, fermez les yeux et
+       suivez seulement les mots. Si c'est encore trop, posez le téléphone :
+       ne rien faire est aussi une réponse valable.</small></p>
+  </section>
+
+  <!-- ========================================================
+       VUE 4 — RÉGLAGES
+       ======================================================== -->
+  <section id="vue-reglages" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-reglages" hidden>
+    <h1>Réglages</h1>
+
+    <div class="carte">
+      <h2>Contact d'urgence</h2>
+
+      <label for="r-nom">Son nom</label>
+      <input type="text" id="r-nom" placeholder="Par exemple : Maman, Sam, Dr Roche" autocomplete="name">
+
+      <label for="r-tel">Son numéro</label>
+      <input type="tel" id="r-tel" placeholder="06 12 34 56 78" autocomplete="tel">
+
+      <button type="button" id="btn-choisir-contact" class="masque" style="margin-bottom:16px">
+        Choisir dans mes contacts
+      </button>
+
+      <label for="r-message">Message envoyé par SMS à ce contact</label>
+      <textarea id="r-message"></textarea>
+
+      <label for="r-carte">Message affiché en grand, pour les gens autour de moi</label>
+      <textarea id="r-carte"></textarea>
+
+      <p><small>Dans ces deux textes, écrivez <strong>[Contact]</strong> et
+         <strong>[Numéro]</strong> : ils seront remplacés automatiquement par le nom
+         et le numéro saisis ci-dessus.</small></p>
+      <button type="button" id="btn-defaut-message">Remettre les textes d'origine</button>
+    </div>
+
+    <div class="carte">
+      <h2>Confort visuel</h2>
+      <label class="interrupteur" for="r-theme-clair">
+        <span>Thème clair (beige)</span>
+        <input type="checkbox" id="r-theme-clair">
+      </label>
+      <label class="interrupteur" for="r-bouclier-demarrage">
+        <span>Démarrer directement en bouclier sensoriel</span>
+        <input type="checkbox" id="r-bouclier-demarrage">
+      </label>
+      <label class="interrupteur" for="r-ecran-allume">
+        <span>Garder l'écran allumé dans l'application</span>
+        <input type="checkbox" id="r-ecran-allume">
+      </label>
+
+      <h3 style="margin-top:18px">Taille du texte</h3>
+      <div class="choix" id="choix-taille" role="group" aria-label="Taille du texte">
+        <button type="button" data-echelle="0.9">Petit</button>
+        <button type="button" data-echelle="1" aria-pressed="true">Normal</button>
+        <button type="button" data-echelle="1.15">Grand</button>
+        <button type="button" data-echelle="1.35">Très grand</button>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Ce que fait le bouton d'aide</h2>
+      <label class="interrupteur" for="r-ouvrir-sms">
+        <span>Préparer le SMS pour mon contact</span>
+        <input type="checkbox" id="r-ouvrir-sms" checked>
+      </label>
+      <label class="interrupteur" for="r-afficher-carte">
+        <span>Afficher le message en grand sur l'écran</span>
+        <input type="checkbox" id="r-afficher-carte" checked>
+      </label>
+      <label class="interrupteur" for="r-bouclier-auto">
+        <span>Activer aussi le bouclier sensoriel</span>
+        <input type="checkbox" id="r-bouclier-auto">
+      </label>
+    </div>
+
+    <div class="carte">
+      <h2>À propos</h2>
+      <p><small>Refuge fonctionne entièrement hors-ligne. Vos réglages et votre
+         journal restent sur ce téléphone ; ils ne sont jamais envoyés ailleurs.
+         Cette application n'est pas un dispositif médical et ne remplace ni un
+         professionnel, ni les secours (15, 112).</small></p>
+      <p><small>Version 1.0</small></p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ====== Barre d'onglets ====== -->
+<nav class="onglets" role="tablist" aria-label="Navigation principale">
+  <button class="onglet" id="onglet-accueil" role="tab" aria-selected="true"
+          aria-controls="vue-accueil" data-vue="accueil">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+    Accueil
+  </button>
+  <button class="onglet" id="onglet-respiration" role="tab" aria-selected="false"
+          aria-controls="vue-respiration" data-vue="respiration">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>
+    Respirer
+  </button>
+  <button class="onglet" id="onglet-journal" role="tab" aria-selected="false"
+          aria-controls="vue-journal" data-vue="journal">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>
+    Journal
+  </button>
+  <button class="onglet" id="onglet-reglages" role="tab" aria-selected="false"
+          aria-controls="vue-reglages" data-vue="reglages">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+    Réglages
+  </button>
+</nav>
+
+<!-- ====== Carte de communication plein écran ====== -->
+<div id="carte-sos" class="carte-sos" hidden role="dialog" aria-modal="true" aria-label="Message à montrer">
+  <p class="message" id="sos-message"></p>
+  <div class="pied">
+    <button type="button" id="sos-appeler" class="bouton-doux masque" style="margin-bottom:12px"></button>
+    <button type="button" id="sos-contraste" style="margin-bottom:12px" aria-pressed="false">
+      Éclaircir pour le montrer
+    </button>
+    <button type="button" id="sos-fermer">Fermer</button>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>

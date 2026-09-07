@@ -1,0 +1,386 @@
+/* ============================================================
+   REFUGE — feuille de style
+   Principes sensoriels appliqués :
+   - aucun blanc pur, aucun noir sur blanc : contrastes doux
+   - aucune animation rapide, aucun clignotement
+   - zones tactiles très larges (min 64px) : la motricité fine
+     se dégrade pendant une crise
+   - trois thèmes : Doux sombre (défaut), Doux clair, Bouclier
+   ============================================================ */
+
+/* ---------- 1. Thèmes (variables de couleur) ---------- */
+
+:root {
+  /* Thème DOUX SOMBRE — celui par défaut */
+  --bg:          #171b21;
+  --surface:     #1e242c;
+  --surface-2:   #262d37;
+  --bord:        #333b46;
+  --texte:       #d2d8de;   /* gris très clair, jamais #fff */
+  --texte-doux:  #96a0ac;
+  --accent:      #7ea8a0;   /* vert sauge désaturé */
+  --accent-fond: #24322f;
+  --aide-fond:   #4a3a34;   /* terracotta profond, jamais rouge vif */
+  --aide-bord:   #a97f6d;
+  --aide-texte:  #f0d9cd;
+  --rayon: 20px;
+  --duree: 300ms;           /* toutes les transitions, volontairement lentes */
+  --echelle: 1;             /* taille de police, pilotée par les reglages */
+}
+
+html[data-theme="clair"] {
+  --bg:          #f1eee8;   /* beige papier, jamais #fff */
+  --surface:     #f8f6f1;
+  --surface-2:   #ebe7df;
+  --bord:        #d8d2c7;
+  --texte:       #3b4046;
+  --texte-doux:  #6e757d;
+  --accent:      #5d8579;
+  --accent-fond: #e2ebe6;
+  --aide-fond:   #f0dcd2;
+  --aide-bord:   #c08e78;
+  --aide-texte:  #5a3a2c;
+}
+
+/* Thème BOUCLIER : noir absolu #000 (pixels OLED éteints = batterie
+   économisée et zero lumiere émise), texte gris très doux. */
+html[data-bouclier="on"] {
+  --bg:          #000000;
+  --surface:     #000000;
+  --surface-2:   #070707;
+  --bord:        #232323;
+  --texte:       #6f6f6f;
+  --texte-doux:  #4d4d4d;
+  --accent:      #3f4b48;
+  --accent-fond: #000000;
+  --aide-fond:   #000000;
+  --aide-bord:   #4a413d;
+  --aide-texte:  #8a7f79;
+  --duree: 0ms;             /* plus aucune transition en crise */
+}
+
+/* En bouclier, le Journal reste lisible : contraste doux mais suffisant. */
+html[data-bouclier="on"] .lisible-en-bouclier {
+  --texte:      #8e8e8e;
+  --texte-doux: #666666;
+}
+
+/* ---------- 2. Base ---------- */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--texte);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: calc(17px * var(--echelle));
+  line-height: 1.6;
+  overscroll-behavior: none;
+  transition: background var(--duree) linear, color var(--duree) linear;
+}
+
+body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  /* On respecte les encoches et la barre de navigation Android */
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Respect absolu du réglage système "réduire les animations" */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+h1, h2, h3 { font-weight: 600; line-height: 1.3; margin: 0 0 12px; }
+h1 { font-size: 1.35rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; color: var(--texte-doux); font-weight: 600; }
+p  { margin: 0 0 14px; }
+small { font-size: 0.85rem; color: var(--texte-doux); }
+
+/* Focus toujours visible : indispensable au clavier et aux lecteurs d'écran */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+/* ---------- 3. Mise en page ---------- */
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 20px 18px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vue { display: none; max-width: 640px; width: 100%; margin: 0 auto; }
+.vue.active { display: block; }
+
+/* L'accueil se centre verticalement : les boutons tombent ainsi dans la
+   zone basse de l'écran, celle qu'un pouce atteint sans changer de prise. */
+#vue-accueil.active { display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
+
+.carte {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+/* ---------- 4. Boutons ---------- */
+
+button, .bouton {
+  font: inherit;
+  color: var(--texte);
+  background: var(--surface-2);
+  border: 1px solid var(--bord);
+  border-radius: 16px;
+  padding: 16px 18px;
+  min-height: 60px;
+  width: 100%;
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--duree) linear, border-color var(--duree) linear;
+}
+
+button:active { background: var(--bord); }
+
+.bouton-doux {
+  background: var(--accent-fond);
+  border-color: var(--accent);
+  color: var(--texte);
+}
+
+/* LE bouton d'appel à l'aide : énorme, impossible à manquer,
+   mais chaleureux plutôt qu'alarmant. */
+.bouton-aide {
+  background: var(--aide-fond);
+  border: 2px solid var(--aide-bord);
+  color: var(--aide-texte);
+  min-height: 168px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: 26px;
+  margin-bottom: 16px;
+  padding: 20px;
+}
+
+.bouton-aide .sous {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-top: 10px;
+  opacity: 0.85;
+}
+
+.bouton-rangee { display: flex; gap: 12px; }
+.bouton-rangee > * { flex: 1; }
+
+/* ---------- 5. Barre d'onglets ---------- */
+
+.onglets {
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--bord);
+  padding-bottom: env(safe-area-inset-bottom);
+  flex-shrink: 0;
+}
+
+.onglet {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--texte-doux);
+  min-height: 68px;
+  padding: 8px 4px;
+  font-size: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.onglet svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.onglet[aria-selected="true"] {
+  color: var(--accent);
+  background: var(--accent-fond);
+  box-shadow: inset 0 2px 0 var(--accent);   /* repère franc mais silencieux */
+}
+html[data-bouclier="on"] .onglet[aria-selected="true"] { color: var(--texte); background: #0d0d0d; }
+
+/* ---------- 6. Formulaires ---------- */
+
+label { display: block; margin-bottom: 8px; color: var(--texte-doux); font-size: 0.92rem; }
+
+input[type="text"], input[type="tel"], input[type="number"],
+input[type="datetime-local"], textarea, select {
+  font: inherit;
+  width: 100%;
+  color: var(--texte);
+  background: var(--surface-2);
+  border: 1px solid var(--bord);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 56px;
+  margin-bottom: 16px;
+}
+
+textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+
+/* Interrupteur (case à cocher agrandie, zone tactile confortable) */
+.interrupteur {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--bord);
+  margin: 0;
+  color: var(--texte);
+  font-size: 1rem;
+}
+.interrupteur:last-child { border-bottom: none; }
+.interrupteur input { width: 30px; height: 30px; flex-shrink: 0; accent-color: var(--accent); margin: 0; }
+
+/* Groupes de choix (intensité, préréglages, durée) */
+.choix { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.choix button {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 12px;
+}
+.choix button[aria-pressed="true"] {
+  background: var(--accent-fond);
+  border-color: var(--accent);
+  color: var(--texte);
+  font-weight: 600;
+}
+html[data-bouclier="on"] .choix button[aria-pressed="true"] { background: #101010; }
+
+/* ---------- 7. Guides du mode bouclier ---------- */
+
+.guide { border-left: 3px solid var(--accent); padding-left: 14px; margin-bottom: 20px; }
+.guide h3 { color: var(--texte); margin-bottom: 6px; }
+.guide p { color: var(--texte-doux); margin-bottom: 0; font-size: 0.95rem; }
+.etapes { margin: 8px 0 0; padding-left: 20px; color: var(--texte-doux); font-size: 0.95rem; }
+.etapes li { margin-bottom: 6px; }
+
+/* ---------- 8. Carte de communication (plein écran) ---------- */
+
+.carte-sos {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 28px 24px calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.carte-sos[hidden] { display: none; }
+.carte-sos .message {
+  white-space: pre-line;   /* respecte les retours à la ligne du message */
+  font-size: 1.6rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--texte);
+  margin-bottom: 28px;
+}
+html[data-bouclier="on"] .carte-sos .message { color: #9a9a9a; }
+
+/* Contraste renforcé, activé à la demande : pour tendre le téléphone à
+   quelqu'un. Jamais automatique — la lumière reste toujours un choix. */
+.carte-sos.contraste-fort .message,
+html[data-bouclier="on"] .carte-sos.contraste-fort .message { color: #d8d8d8; }
+.carte-sos.contraste-fort { background: #101010; }
+.carte-sos .pied { margin-top: auto; padding-top: 28px; }
+
+/* ---------- 9. Journal ---------- */
+
+.entree {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.entree .haut { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.entree .date { font-weight: 600; }
+.entree .meta { color: var(--texte-doux); font-size: 0.9rem; margin-top: 6px; }
+.jauge { display: inline-flex; gap: 4px; vertical-align: middle; }
+.jauge i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--accent); display: block; }
+.jauge i.plein { background: var(--accent); }
+.supprimer { width: auto; min-height: 48px; padding: 10px 16px; font-size: 0.9rem; margin-top: 12px; }
+
+/* ---------- 10. Respiration ---------- */
+
+.scene-respiration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  margin: 10px 0 6px;
+}
+.cercle {
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--accent-fond);
+  transform: scale(0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* En bouclier : simple contour fin gris, aucun aplat lumineux */
+html[data-bouclier="on"] .cercle {
+  background: transparent;
+  border: 1px solid #2e2e2e;
+}
+.consigne {
+  text-align: center;
+  font-size: 1.3rem;
+  min-height: 2.2em;
+  color: var(--texte);
+  margin-bottom: 4px;
+}
+.compteur { text-align: center; color: var(--texte-doux); margin-bottom: 20px; font-variant-numeric: tabular-nums; }
+
+/* ---------- 11. Divers ---------- */
+
+.avis {
+  background: var(--accent-fond);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  font-size: 0.92rem;
+  color: var(--texte);
+}
+html[data-bouclier="on"] .avis { background: #0a0a0a; border-color: var(--bord); }
+.vide { color: var(--texte-doux); text-align: center; padding: 36px 12px; }
+.masque { display: none !important; }
+
+/* Message d'état annoncé aux lecteurs d'écran */
+.annonce {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
