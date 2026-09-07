@@ -44,6 +44,7 @@ const REGLAGES_DEFAUT = {
   aideOuvreSms: true,
   aideAfficheCarte: true,
   aideActiveBouclier: false,
+  contactsIndisponibles: false,
   rythme: 'coherence',
   dureeRespi: 3
 };
@@ -676,6 +677,22 @@ function majBoutonAide() {
   $('#rappel-reglages').classList.toggle('masque', !!numeroPropre(reglages.tel));
 }
 
+/* Quelles informations de contact ce téléphone accepte-t-il de donner ?
+   La question est posée au démarrage, et jamais au moment du clic : entre
+   l'appui du doigt et l'ouverture de la liste, Android n'autorise aucune
+   attente, sinon il considère que le geste n'est plus « frais » et refuse. */
+let proprietesContacts = ['name', 'tel'];
+
+function preparerContacts() {
+  if (!('contacts' in navigator) || !('ContactsManager' in window)) return;
+  if (typeof navigator.contacts.getProperties !== 'function') return;
+  navigator.contacts.getProperties()
+    .then((dispo) => {
+      proprietesContacts = ['name', 'tel'].filter((p) => dispo.includes(p));
+    })
+    .catch(() => { /* on gardera la liste par défaut */ });
+}
+
 /* Affiche un message sous le bouton « Choisir dans mes contacts ».
    Le paragraphe est créé à la volée : rien à ajouter dans index.html. */
 function messageContact(texte) {
@@ -726,14 +743,19 @@ function initReglages() {
      page ouverte en plein écran (jamais dans un aperçu intégré à une autre
      page). Quand elle échoue, le bouton doit le DIRE : un bouton muet est
      un bouton cassé. La saisie à la main reste toujours possible. */
-  if ('contacts' in navigator && 'ContactsManager' in window) {
+  if ('contacts' in navigator && 'ContactsManager' in window && !reglages.contactsIndisponibles) {
     const btn = $('#btn-choisir-contact');
     btn.classList.remove('masque');
 
     btn.addEventListener('click', async () => {
       messageContact('');
       try {
-        const resultat = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+        if (proprietesContacts.length === 0) {
+          throw Object.assign(new Error('rien de lisible'), { name: 'NotSupportedError' });
+        }
+        /* Appel immédiat, sans aucun await avant : c'est la condition pour
+           qu'Android accepte d'ouvrir la liste des contacts. */
+        const resultat = await navigator.contacts.select(proprietesContacts, { multiple: false });
 
         /* Liste refermée sans rien choisir : ce n'est pas une erreur. */
         if (!resultat || resultat.length === 0) return;
@@ -750,11 +772,20 @@ function initReglages() {
           messageContact('Contact repris : ' + (reglages.nom || 'sans nom') + ' — ' + reglages.tel);
         }
       } catch (e) {
-        /* L'utilisateur a fermé la liste lui-même : on ne dit rien. */
+        /* L'utilisateur a fermé la liste lui-même : ce n'est pas une panne. */
         if (e && e.name === 'AbortError') return;
+
+        /* Ce téléphone ne sait pas ouvrir ses contacts au navigateur.
+           Plutôt que de laisser un bouton qui échouera à chaque fois, on le
+           retire définitivement : un raccourci qui ne marche pas est pire
+           que pas de raccourci du tout. La saisie à la main reste entière. */
+        btn.classList.add('masque');
+        reglages.contactsIndisponibles = true;
+        sauverReglages();
         messageContact(
-          "Votre navigateur refuse l'accès aux contacts ici. Saisissez le nom et le "
-          + "numéro à la main juste au-dessus : l'application fonctionnera exactement "
+          "Votre téléphone ne permet pas au navigateur d'ouvrir vos contacts. "
+          + "Ce bouton a donc été retiré. Saisissez le nom et le numéro à la main "
+          + "dans les deux champs ci-dessus : l'application fonctionnera exactement "
           + "pareil. (Code technique : " + ((e && e.name) || 'inconnu') + ")");
         console.warn('Sélecteur de contacts indisponible.', e);
       }
@@ -780,6 +811,7 @@ function initReglages() {
 
 async function demarrer() {
   chargerReglages();
+  preparerContacts();
   appliquerTheme();
   initReglages();
   majBoutonAide();
