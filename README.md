@@ -109,3 +109,16 @@ visuels.
 
 Refuge n'est pas un dispositif médical. En cas de danger vital : **15** (SAMU)
 ou **112**.
+
+---
+
+## Licence
+
+Distribué sous licence **[MIT](LICENSE)**.
+
+Vous pouvez utiliser, modifier et redistribuer ce code librement, y compris à
+des fins commerciales, à la seule condition de conserver la mention de
+copyright et le texte de la licence. Le logiciel est fourni « en l'état »,
+sans aucune garantie.
+
+© 2026 FerrusDantioch
