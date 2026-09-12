@@ -40,6 +40,8 @@
 
     <button id="btn-respirer-vite" style="margin-bottom:16px">Respirer avec moi</button>
 
+    <button id="btn-urgences" style="margin-bottom:16px">Numéros d'urgence</button>
+
     <!-- Guides affichés uniquement quand le bouclier est actif -->
     <div id="guides-bouclier" class="carte masque">
       <h2>Vous êtes en sécurité. Trois gestes.</h2>
@@ -288,7 +290,15 @@
          journal restent sur ce téléphone ; ils ne sont jamais envoyés ailleurs.
          Cette application n'est pas un dispositif médical et ne remplace ni un
          professionnel, ni les secours (15, 112).</small></p>
-      <p><small>Version 1.1</small></p>
+
+      <button type="button" id="btn-urgences-reglages" style="margin-bottom:16px">
+        Numéros d'urgence
+      </button>
+      <p><small>La même liste que depuis l'écran d'accueil. Lisez-la une fois au
+         calme : savoir à l'avance qui répond et ce qu'on vous demandera enlève
+         une inconnue le jour où ça compte.</small></p>
+
+      <p><small>Version 1.2</small></p>
     </div>
   </section>
 
@@ -335,6 +345,73 @@
       Éclaircir pour le montrer
     </button>
     <button type="button" id="sos-fermer">Fermer</button>
+  </div>
+</div>
+
+<!-- ====== Numéros d'urgence, plein écran ======
+     Ce n'est pas un clavier d'urgence, c'est de quoi savoir à l'avance.
+     Chaque numéro dit ce qui se passe quand on appelle : qui répond, ce
+     qu'on demandera, si c'est gratuit. Appeler demande toujours deux
+     appuis : on ne joint jamais les secours par mégarde. -->
+<div id="carte-urgences" class="carte-sos urgences lisible-en-bouclier" hidden tabindex="-1"
+     role="dialog" aria-modal="true" aria-labelledby="urgences-titre">
+
+  <h2 id="urgences-titre">Numéros d'urgence</h2>
+  <p class="intro">En France, tous ces numéros sont gratuits et répondent
+     24 h/24. Ils sont là pour que vous sachiez déjà ce qui existe, et ce qui
+     se passe si vous appelez un jour. Vous n'avez rien à en faire aujourd'hui.</p>
+
+  <div class="urgence">
+    <p class="tete"><span class="numero">114</span> Urgences par SMS ou visio</p>
+    <p>Le numéro d'urgence des personnes qui ne peuvent pas parler : sourdes,
+       malentendantes, aphasiques, ou sans voix sur le moment. Vous écrivez,
+       on vous répond par écrit. Le 114 prévient ensuite le SAMU, les pompiers
+       ou la police à votre place.</p>
+    <button type="button" data-sms="114">Écrire au 114</button>
+  </div>
+
+  <div class="urgence">
+    <p class="tete"><span class="numero">15</span> SAMU — urgence médicale</p>
+    <p>Un médecin régulateur répond. On vous demandera d'abord <strong>où vous
+       êtes</strong>, puis ce qui se passe. Si vous ne pouvez pas parler,
+       passez par le 114.</p>
+    <button type="button" data-appel="15">Appeler le 15</button>
+  </div>
+
+  <div class="urgence">
+    <p class="tete"><span class="numero">18</span> Pompiers</p>
+    <p>Accident, incendie, malaise, danger immédiat. Là aussi, l'adresse est
+       demandée en premier.</p>
+    <button type="button" data-appel="18">Appeler le 18</button>
+  </div>
+
+  <div class="urgence">
+    <p class="tete"><span class="numero">17</span> Police, gendarmerie</p>
+    <p>Quand le danger vient de quelqu'un.</p>
+    <button type="button" data-appel="17">Appeler le 17</button>
+  </div>
+
+  <div class="urgence">
+    <p class="tete"><span class="numero">112</span> Urgences, partout en Europe</p>
+    <p>Fonctionne depuis n'importe quel téléphone, dans tous les pays
+       européens, même sans forfait ni carte SIM. Il redirige vers le bon
+       service.</p>
+    <button type="button" data-appel="112">Appeler le 112</button>
+  </div>
+
+  <div class="urgence">
+    <p class="tete"><span class="numero">3114</span> Prévention du suicide</p>
+    <p>Pour les pensées suicidaires, les vôtres ou celles de quelqu'un d'autre.
+       Un professionnel écoute, sans jugement, aussi longtemps qu'il le faut.
+       On peut appeler seulement pour parler à quelqu'un.</p>
+    <button type="button" data-appel="3114">Appeler le 3114</button>
+  </div>
+
+  <p><small>Refuge n'est pas un dispositif médical et ne remplace ni un
+     professionnel, ni les secours.</small></p>
+
+  <div class="pied">
+    <button type="button" id="urgences-fermer">Fermer</button>
   </div>
 </div>
 

@@ -313,6 +313,45 @@ html[data-bouclier="on"] .carte-sos.contraste-fort .message { color: #d8d8d8; }
 .carte-sos.contraste-fort { background: #101010; }
 .carte-sos .pied { margin-top: auto; padding-top: 28px; }
 
+/* ---------- 8 bis. Numéros d'urgence ----------
+   Même carte plein écran, mais une liste qui se lit et qui défile :
+   elle part donc du haut, au lieu d'être centrée. */
+.carte-sos.urgences { justify-content: flex-start; }
+.carte-sos.urgences h2 { font-size: 1.3rem; margin-bottom: 10px; }
+.carte-sos.urgences .intro { color: var(--texte-doux); margin-bottom: 24px; }
+
+.urgence {
+  border-top: 1px solid var(--bord);
+  padding-top: 18px;
+  margin-bottom: 22px;
+}
+.urgence .tete { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
+/* Le numéro lui-même, lisible d'un coup d'œil et sans ambiguïté. */
+.urgence .numero {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-right: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.urgence p { color: var(--texte-doux); font-size: 0.95rem; margin-bottom: 14px; }
+.urgence p strong { color: var(--texte); }
+/* Un bouton armé attend une confirmation : il change de couleur pour que
+   ce second appui soit un choix, pas un réflexe. */
+.urgence button.arme { background: var(--accent-fond); border-color: var(--accent); }
+
+/* En bouclier, --accent descend très bas (#3f4b48) : le numéro deviendrait
+   l'élément le MOINS lisible de la carte, alors que c'est le seul qu'il
+   faut vraiment pouvoir lire. On lui rend le gris de lisible-en-bouclier.
+   Même raison pour le bouton armé : il faut voir qu'un second appui
+   appellerait vraiment les secours. */
+html[data-bouclier="on"] .urgence .numero { color: #8e8e8e; }
+html[data-bouclier="on"] .urgence button.arme {
+  background: #101010;
+  border-color: #5a5a5a;
+  color: #9a9a9a;
+}
+
 /* ---------- 9. Journal ---------- */
 
 .entree {

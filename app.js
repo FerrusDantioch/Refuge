@@ -483,6 +483,77 @@ $('#btn-respirer-vite').addEventListener('click', () => {
 
 
 /* ============================================================
+   4 bis. NUMÉROS D'URGENCE
+   ------------------------------------------------------------
+   Ce n'est pas un clavier d'urgence, c'est de quoi savoir à
+   l'avance. Le besoin d'anticipation est fort : connaître déjà qui
+   répond, ce qu'on vous demandera et si c'est gratuit enlève une
+   inconnue le jour où ça compte. D'où le texte qui accompagne
+   chaque numéro plutôt qu'une simple liste de chiffres.
+
+   Appeler demande DEUX appuis, comme la suppression dans le
+   journal : on ne joint jamais les secours par mégarde, surtout
+   quand la motricité fine s'est dégradée.
+   ============================================================ */
+
+let ouvreurUrgences = null;   /* le bouton par lequel on est entré */
+let minuteurUrgences = null;
+
+/* Remet tous les boutons d'appel au repos. */
+function desarmerUrgences() {
+  clearTimeout(minuteurUrgences);
+  $$('#carte-urgences button[data-appel]').forEach((b) => {
+    b.classList.remove('arme');
+    b.textContent = 'Appeler le ' + b.dataset.appel;
+  });
+}
+
+function ouvrirUrgences(ouvert, depuis) {
+  const carte = $('#carte-urgences');
+  carte.hidden = !ouvert;
+  if (ouvert) {
+    ouvreurUrgences = depuis;
+    /* On donne le focus à la carte elle-même, pas au bouton « Fermer » :
+       celui-ci est tout en bas, et le focus l'aurait fait défiler jusqu'à
+       lui — on ouvrait la liste par la fin. preventScroll pour la même
+       raison. Le 114 doit être la première chose que l'on voit. */
+    carte.focus({ preventScroll: true });
+    carte.scrollTop = 0;
+    annoncer("Numéros d'urgence.");
+  } else {
+    desarmerUrgences();
+    if (ouvreurUrgences) ouvreurUrgences.focus();
+  }
+}
+
+$('#btn-urgences').addEventListener('click', (e) => ouvrirUrgences(true, e.currentTarget));
+$('#btn-urgences-reglages').addEventListener('click', (e) => ouvrirUrgences(true, e.currentTarget));
+$('#urgences-fermer').addEventListener('click', () => ouvrirUrgences(false));
+
+/* Le 114 s'écrit, il ne s'appelle pas : c'est précisément son intérêt
+   pour quelqu'un qui ne peut pas parler. Un seul appui suffit donc —
+   ouvrir Messages n'engage rien, le texte reste à écrire et à envoyer. */
+$$('#carte-urgences button[data-sms]').forEach((b) => {
+  b.addEventListener('click', () => {
+    window.location.href = 'sms:' + b.dataset.sms;
+  });
+});
+
+$$('#carte-urgences button[data-appel]').forEach((b) => {
+  b.addEventListener('click', () => {
+    if (!b.classList.contains('arme')) {
+      desarmerUrgences();                  /* un seul bouton armé à la fois */
+      b.classList.add('arme');
+      b.textContent = "Confirmer l'appel au " + b.dataset.appel;
+      minuteurUrgences = setTimeout(desarmerUrgences, 5000);
+      return;
+    }
+    window.location.href = 'tel:' + b.dataset.appel;
+  });
+});
+
+
+/* ============================================================
    5. JOURNAL DE CRISES — base de données locale (IndexedDB)
    ------------------------------------------------------------
    IndexedDB est l'« armoire à dossiers » du navigateur : elle vit
