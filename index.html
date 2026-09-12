@@ -212,6 +212,10 @@
       <p><small>Dans ces deux textes, écrivez <strong>[Contact]</strong> et
          <strong>[Numéro]</strong> : ils seront remplacés automatiquement par le nom
          et le numéro saisis ci-dessus.</small></p>
+      <p><small>Dans le SMS seulement, <strong>[Position]</strong> indique où
+         placer le lien vers votre position, si vous activez cette option plus
+         bas. Sans ce mot, le lien est ajouté à la fin du message ; si l'option
+         est éteinte, il ne se passe rien.</small></p>
       <button type="button" id="btn-defaut-message">Remettre les textes d'origine</button>
     </div>
 
@@ -253,6 +257,29 @@
         <span>Activer aussi le bouclier sensoriel</span>
         <input type="checkbox" id="r-bouclier-auto">
       </label>
+      <label class="interrupteur" for="r-position">
+        <span>Joindre ma position au SMS</span>
+        <input type="checkbox" id="r-position">
+      </label>
+
+      <p id="r-position-etat"><small></small></p>
+      <button type="button" id="btn-tester-position" style="margin-bottom:16px">
+        Tester ma position
+      </button>
+
+      <p><small>Un lien <strong>OpenStreetMap</strong> est ajouté au SMS — sans
+         compte ni traceur — avec la précision réelle du point et l'heure du
+         relevé, pour que votre contact sache à quel point s'y fier.</small></p>
+      <p><small>Faites ce test <strong>maintenant, au calme</strong> : c'est lui
+         qui demande l'autorisation à Android. Refuge ne la demandera jamais
+         pendant une crise — si elle n'est pas déjà accordée, le SMS partira
+         simplement sans position, sans aucune fenêtre à gérer.</small></p>
+      <p><small>Avant l'envoi, la carte affiche ce qui sera joint, avec un
+         bouton pour retirer votre position cette fois-ci. L'application
+         n'envoie rien elle-même : les coordonnées arrivent dans
+         l'application Messages, et c'est vous qui appuyez sur Envoyer. Pour
+         situer le téléphone, Android peut interroger le réseau, comme pour
+         n'importe quelle application qui demande une position.</small></p>
     </div>
 
     <div class="carte">
@@ -261,7 +288,7 @@
          journal restent sur ce téléphone ; ils ne sont jamais envoyés ailleurs.
          Cette application n'est pas un dispositif médical et ne remplace ni un
          professionnel, ni les secours (15, 112).</small></p>
-      <p><small>Version 1.0</small></p>
+      <p><small>Version 1.1</small></p>
     </div>
   </section>
 
@@ -296,6 +323,12 @@
   <p class="message" id="sos-message"></p>
   <p class="avis masque" id="sos-avertissement"></p>
   <div class="pied">
+    <!-- Ligne de transparence : ce qui part avec le SMS, et comment le retirer.
+         Elle n'apparaît que si la position est activée dans les Réglages. -->
+    <div id="sos-position" class="avis masque">
+      <p id="sos-position-texte"></p>
+      <button type="button" id="sos-position-retirer" class="masque"></button>
+    </div>
     <button type="button" id="sos-envoyer" class="bouton-doux masque" style="margin-bottom:12px"></button>
     <button type="button" id="sos-appeler" class="masque" style="margin-bottom:12px"></button>
     <button type="button" id="sos-contraste" style="margin-bottom:12px" aria-pressed="false">

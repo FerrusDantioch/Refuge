@@ -107,6 +107,14 @@ l'application SMS avec le destinataire et le texte déjà remplis (il reste un
 appui sur « Envoyer »), et accompagne les deux autres gestes par des guides
 visuels.
 
+La position (facultative, éteinte par défaut) suit la même règle : Refuge
+n'envoie rien, il ajoute un lien **OpenStreetMap** au texte du SMS, avec la
+précision réelle du point et l'heure du relevé. Avant l'envoi, la carte affiche
+ce qui sera joint et propose de le retirer d'un appui. L'autorisation Android
+se demande **une seule fois, depuis les Réglages, à tête reposée** : jamais
+pendant une crise. Si le point n'est pas trouvé à temps — en intérieur, c'est
+fréquent — le SMS part sans lui, sans rien bloquer.
+
 Refuge n'est pas un dispositif médical. En cas de danger vital : **15** (SAMU)
 ou **112**.
 
