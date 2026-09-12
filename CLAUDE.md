@@ -36,6 +36,14 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   point est oublié à la fermeture (il ne doit jamais resservir ailleurs).
 - **Ce n'est pas un dispositif médical.** Garder visible la mention des numéros
   d'urgence français (15 / 112).
+- **Carte « Numéros d'urgence » : deux appuis pour appeler.** Elle sert d'abord
+  à *anticiper* — savoir qui répond et ce qu'on demandera — pas à composer vite.
+  D'où le texte qui accompagne chaque numéro, et le 114 (urgences par SMS, pour
+  qui ne peut pas parler) placé en premier. Un appel des secours déclenché par
+  mégarde pendant une crise est un vrai risque : ne jamais ramener ces boutons
+  à un seul appui. La carte s'ouvre en donnant le focus à elle-même
+  (`preventScroll`) et non au bouton « Fermer », sinon la liste s'ouvre par la
+  fin.
 
 ## ⚠️ Avant de pousser : incrémenter la version du service worker
 
