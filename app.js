@@ -26,7 +26,7 @@ function annoncer(texte) { $('#annonce').textContent = texte; }
 
 const MESSAGE_SMS_DEFAUT =
   "Je fais une crise d'autisme, je ne peux pas parler. J'ai besoin d'aide. " +
-  "Peux-tu m'appeler ou venir me rejoindre ?";
+  "Peux-tu m'appeler ou venir me rejoindre ?\n\n[Position]";
 
 const MESSAGE_CARTE_DEFAUT =
   "Je fais une crise d'autisme, je ne peux pas parler.\n\n" +
@@ -44,6 +44,7 @@ const REGLAGES_DEFAUT = {
   aideOuvreSms: true,
   aideAfficheCarte: true,
   aideActiveBouclier: false,
+  aideJointPosition: false,   /* éteint par défaut : voir section POSITION */
   rythme: 'coherence',
   dureeRespi: 3
 };
@@ -70,12 +71,16 @@ function sauverReglages() {
 }
 
 /* Remplace [Contact] et [Numéro] par les vraies valeurs.
-   La variante sans accent est acceptée, par tolérance. */
+   La variante sans accent est acceptée, par tolérance.
+   [Position] est traité en amont par corpsSms() ; ici on le retire, pour
+   qu'un jeton écrit par erreur dans le message affiché aux gens autour
+   n'apparaisse jamais tel quel à l'écran. */
 function remplir(texte) {
   return (texte || '')
     .replaceAll('[Contact]', reglages.nom || 'mon contact')
     .replaceAll('[Numéro]', reglages.tel || '')
-    .replaceAll('[Numero]', reglages.tel || '');
+    .replaceAll('[Numero]', reglages.tel || '')
+    .replaceAll('[Position]', '');
 }
 
 
@@ -157,12 +162,206 @@ function numeroPropre(tel) {
   return (tel || '').replace(/[^\d+]/g, '');
 }
 
+/* ------------------------------------------------------------
+   POSITION — joindre un point de repère au SMS
+   ------------------------------------------------------------
+   Deux règles non négociables, pour les mêmes raisons que le reste
+   de cette application :
+
+   1. L'autorisation de localisation n'est JAMAIS demandée pendant une
+      crise. Une boîte de dialogue système qui surgit, du texte à lire,
+      un appui de travers sur « Bloquer » — et la fonction est morte pour
+      de bon, avec un réglage de navigateur introuvable pour la rallumer.
+      Elle se demande donc à froid, depuis l'onglet Réglages. Si elle
+      n'est pas déjà accordée au moment de la crise, on renonce en
+      silence : un SMS sans position vaut mieux qu'une fenêtre de plus.
+
+   2. Le SMS n'attend JAMAIS la position. La recherche démarre à
+      l'ouverture de la carte ; si le point n'est pas arrivé quand le
+      doigt touche « Envoyer », le message part sans lui. C'est aussi ce
+      qui garde ouvrirSms() strictement synchrone — condition pour
+      qu'Android accepte d'ouvrir Messages (voir le commentaire plus bas).
+
+   Rien ne quitte l'appareil ici : les coordonnées vont dans le champ
+   texte de l'application Messages, et c'est un humain qui appuie sur
+   Envoyer. Android, lui, peut interroger le réseau pour se situer par le
+   Wi-Fi : c'est le système qui le fait, comme pour n'importe quelle
+   application qui demande une position — jamais Refuge.
+   ------------------------------------------------------------ */
+
+const HEURE_COURTE = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+const position = {
+  etat: 'inactif',   /* inactif | recherche | trouvee | echec | nonAutorisee */
+  point: null,       /* { lat, lon, precision, ts } */
+  veille: null,      /* identifiant rendu par watchPosition */
+  retiree: false,    /* la personne a retiré sa position pour cette fois-ci */
+
+  disponible() { return 'geolocation' in navigator; },
+
+  /* 'granted' | 'denied' | 'prompt' | 'inconnu' — sans jamais rien demander. */
+  async etatAutorisation() {
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        return (await navigator.permissions.query({ name: 'geolocation' })).state;
+      }
+    } catch (e) { /* Interrogation impossible : on le dira 'inconnu'. */ }
+    return 'inconnu';
+  },
+
+  demarrer() {
+    if (!reglages.aideJointPosition || !this.disponible()) return;
+    this.retiree = false;
+    this.etat = 'recherche';
+    majLignePosition();
+
+    this.etatAutorisation().then((autorisation) => {
+      if (autorisation === 'prompt') {
+        /* Jamais accordée : on ne la demande pas maintenant. Règle 1. */
+        this.etat = 'nonAutorisee';
+        majLignePosition();
+        return;
+      }
+
+      /* Premier appel : on accepte volontiers un point que le téléphone a
+         déjà en mémoire (maximumAge), donc souvent immédiat. */
+      navigator.geolocation.getCurrentPosition(
+        (p) => this.retenir(p),
+        (err) => {
+          if (this.etat === 'trouvee') return;   /* la veille a déjà réussi */
+          this.etat = (err && err.code === err.PERMISSION_DENIED)
+            ? 'nonAutorisee' : 'echec';
+          majLignePosition();
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 120000 }
+      );
+
+      /* Puis on affine tant que la carte reste ouverte : en intérieur, le
+         premier point est souvent grossier de plusieurs centaines de mètres. */
+      try {
+        this.veille = navigator.geolocation.watchPosition(
+          (p) => this.retenir(p),
+          () => { /* un échec de la veille ne change rien : on garde le point */ },
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+      } catch (e) {
+        console.warn('Suivi de position indisponible.', e);
+      }
+    });
+  },
+
+  retenir(p) {
+    const nouveau = {
+      lat: p.coords.latitude,
+      lon: p.coords.longitude,
+      precision: p.coords.accuracy,
+      ts: p.timestamp || Date.now()
+    };
+    /* On ne remplace un point que par un point au moins aussi précis :
+       l'imprécision annoncée ne doit jamais augmenter en cours de route. */
+    if (!this.point || nouveau.precision <= this.point.precision) this.point = nouveau;
+    this.etat = 'trouvee';
+    majLignePosition();
+  },
+
+  /* Coupe le GPS sans oublier le point déjà trouvé : appelé quand
+     l'application passe en arrière-plan (batterie). */
+  arreterVeille() {
+    if (this.veille !== null) {
+      navigator.geolocation.clearWatch(this.veille);
+      this.veille = null;
+    }
+  },
+
+  /* Remise à zéro complète, à la fermeture de la carte. Un point gardé
+     d'une crise à l'autre enverrait un jour le contact au mauvais endroit. */
+  oublier() {
+    this.arreterVeille();
+    this.point = null;
+    this.etat = 'inactif';
+    this.retiree = false;
+  }
+};
+
+/* Le texte joint au SMS. Lien OpenStreetMap : pas de compte, pas de
+   traceur, et il s'ouvre dans n'importe quel navigateur. Le niveau de
+   zoom suit la précision réelle — inutile de faire croire au mètre près
+   quand le point vaut 500 m. La précision et l'heure du relevé sont
+   écrites en clair : un contact qui cherche doit savoir à quel point il
+   peut se fier à ce qu'il lit. */
+function blocPosition() {
+  if (!reglages.aideJointPosition || position.retiree || !position.point) return '';
+  const p = position.point;
+  const lat = p.lat.toFixed(5);
+  const lon = p.lon.toFixed(5);
+  const m = Math.round(p.precision);
+  const zoom = m <= 50 ? 18 : m <= 200 ? 17 : m <= 1000 ? 15 : 13;
+  return 'Ma position (à ~' + m + ' m près, relevée à '
+    + HEURE_COURTE.format(new Date(p.ts)) + ') :\n'
+    + 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lon
+    + '#map=' + zoom + '/' + lat + '/' + lon;
+}
+
+/* Assemble le texte du SMS. Purement synchrone : aucun calcul lent,
+   aucune attente — voir la règle 2 ci-dessus. */
+function corpsSms() {
+  const bloc = blocPosition();
+  let texte = reglages.messageSms || '';
+  /* Le jeton [Position] dit OÙ placer le point de repère. S'il manque —
+     message personnalisé écrit avant l'arrivée de cette fonction — on
+     ajoute le bloc à la fin, plutôt que de ne rien joindre du tout. */
+  if (texte.includes('[Position]')) texte = texte.replaceAll('[Position]', bloc);
+  else if (bloc) texte = texte.trimEnd() + '\n\n' + bloc;
+  return remplir(texte).replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function ouvrirSms() {
   const tel = numeroPropre(reglages.tel);
-  const texte = remplir(reglages.messageSms);
   /* La forme « sms:numéro?body=texte » est celle comprise par Android. */
-  const url = 'sms:' + tel + '?body=' + encodeURIComponent(texte);
+  const url = 'sms:' + tel + '?body=' + encodeURIComponent(corpsSms());
   window.location.href = url;
+}
+
+/* La ligne de transparence, sur la carte : la personne voit ce qui va
+   partir avec son message, et peut retirer sa position d'un seul appui.
+   Elle n'est pas là par formalisme — pendant un shutdown, on veut
+   parfois précisément ne PAS être trouvé. Le geste est réversible dans
+   les deux sens : rien n'est définitif. */
+function majLignePosition() {
+  const ligne = $('#sos-position');
+  const btn   = $('#sos-position-retirer');
+
+  /* Cette ligne n'a de sens que sur une carte ouverte qui propose
+     vraiment d'envoyer un SMS. Ailleurs, elle parlerait de rien. */
+  const pertinent = reglages.aideJointPosition
+    && !$('#carte-sos').hidden
+    && !$('#sos-envoyer').classList.contains('masque');
+
+  ligne.classList.toggle('masque', !pertinent);
+  if (!pertinent) return;
+
+  let texte;
+  if (position.retiree) {
+    texte = 'Position retirée. Le SMS partira sans elle.';
+  } else if (position.etat === 'trouvee') {
+    texte = 'Ta position sera jointe au SMS, à ~'
+      + Math.round(position.point.precision) + ' m près.';
+  } else if (position.etat === 'recherche') {
+    texte = 'Recherche de ta position… elle sera jointe si elle arrive à temps.';
+  } else if (position.etat === 'nonAutorisee') {
+    texte = "La localisation n'est pas autorisée pour Refuge. "
+      + 'Le SMS partira sans position.';
+  } else {
+    texte = 'Position introuvable. Le SMS partira sans elle.';
+  }
+  $('#sos-position-texte').textContent = texte;
+
+  /* Le bouton n'apparaît que s'il y a quelque chose à retirer — ou à remettre. */
+  const utile = position.retiree
+    || position.etat === 'trouvee' || position.etat === 'recherche';
+  btn.classList.toggle('masque', !utile);
+  btn.textContent = position.retiree
+    ? 'Joindre ma position' : 'Ne pas joindre ma position';
 }
 
 /* La carte de communication a deux usages opposés, donc deux apparences :
@@ -200,6 +399,15 @@ function afficherCarteSos(avecActions) {
   }
 
   $('#carte-sos').hidden = false;
+
+  /* La recherche de position démarre ICI, au premier geste — pas au moment
+     d'envoyer. C'est tout l'intérêt de la carte en deux temps : le point a
+     le temps d'arriver pendant que la personne lit son message, et l'envoi
+     du SMS n'attend rien. Après l'affichage de la carte, car la ligne de
+     transparence ne s'affiche que sur une carte ouverte. */
+  if (montrerEnvoi) position.demarrer(); else position.oublier();
+  majLignePosition();
+
   (montrerEnvoi ? btnEnvoi : $('#sos-fermer')).focus();
   annoncer(avecActions ? 'Message affiché, avec les actions.' : 'Message affiché en grand.');
 }
@@ -228,7 +436,28 @@ $('#sos-fermer').addEventListener('click', () => {
   $('#sos-contraste').setAttribute('aria-pressed', 'false');
   $('#sos-contraste').textContent = 'Éclaircir pour le montrer';
   $('#sos-avertissement').classList.add('masque');
+  /* On coupe le GPS et on oublie le point : il ne doit pas resservir
+     lors d'une prochaine crise, ailleurs. */
+  position.oublier();
+  majLignePosition();
   $('#btn-aide').focus();
+});
+
+/* Retirer ou remettre sa position, tant que la carte est ouverte. */
+$('#sos-position-retirer').addEventListener('click', () => {
+  position.retiree = !position.retiree;
+  majLignePosition();
+  annoncer(position.retiree
+    ? 'Position retirée du message.'
+    : 'Position jointe au message.');
+});
+
+/* Quand l'application passe en arrière-plan — typiquement parce que
+   Messages vient de s'ouvrir — on coupe le GPS. Le texte du SMS est déjà
+   composé : garder le GPS allumé ne chaufferait le téléphone pour rien.
+   Le dernier point trouvé est conservé, au cas où la personne revienne. */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) position.arreterVeille();
 });
 $('#sos-appeler').addEventListener('click', () => {
   window.location.href = 'tel:' + numeroPropre(reglages.tel);
@@ -692,6 +921,77 @@ function lierCase(idChamp, cle, apres) {
   });
 }
 
+/* --- Position : réglage, et test à tête reposée ---
+   C'est ce bouton « Tester » qui fait apparaître la demande
+   d'autorisation Android. C'est voulu : elle doit surgir maintenant,
+   dans le calme, et jamais pendant une crise. */
+
+function majEtatPosition(texte) {
+  $('#r-position-etat').innerHTML = '<small>' + texte + '</small>';
+}
+
+function afficherEtatPosition() {
+  if (!position.disponible()) {
+    majEtatPosition('Ce navigateur ne sait pas donner de position : '
+      + 'la fonction est indisponible.');
+    return;
+  }
+  if (!reglages.aideJointPosition) {
+    majEtatPosition('Éteint : aucune position ne sera jointe à vos SMS.');
+    return;
+  }
+  position.etatAutorisation().then((autorisation) => {
+    if (autorisation === 'granted') {
+      majEtatPosition('Autorisation accordée. Tout est prêt.');
+    } else if (autorisation === 'denied') {
+      majEtatPosition("Le navigateur refuse la localisation à Refuge : rien ne "
+        + "sera joint. Autorisez-la pour ce site dans les réglages du "
+        + "navigateur, puis touchez « Tester ma position ».");
+    } else {
+      majEtatPosition("Autorisation pas encore accordée. Touchez « Tester ma "
+        + "position » : c'est le bon moment pour le faire, au calme.");
+    }
+  });
+}
+
+function testerPosition() {
+  if (!position.disponible()) { afficherEtatPosition(); return; }
+
+  majEtatPosition('Recherche en cours…');
+  annoncer('Recherche de la position.');
+
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      majEtatPosition('Autorisation accordée. Point trouvé à ~'
+        + Math.round(p.coords.accuracy) + ' m près, à '
+        + HEURE_COURTE.format(new Date(p.timestamp || Date.now())) + '.');
+      annoncer('Position trouvée.');
+    },
+    (err) => {
+      if (err.code === err.PERMISSION_DENIED) {
+        /* Refus franc : on éteint l'interrupteur. Un réglage qui a l'air
+           actif sans l'être serait un mensonge, et se découvrirait au
+           pire moment possible. */
+        reglages.aideJointPosition = false;
+        $('#r-position').checked = false;
+        sauverReglages();
+        majEtatPosition("Autorisation refusée : la fonction vient d'être "
+          + "éteinte. Pour la rallumer, autorisez la localisation pour ce "
+          + "site dans les réglages du navigateur, puis retouchez "
+          + "l'interrupteur.");
+      } else if (err.code === err.POSITION_UNAVAILABLE) {
+        majEtatPosition("Position indisponible. Vérifiez que la localisation "
+          + "du téléphone est allumée, puis réessayez.");
+      } else {
+        majEtatPosition("Trop long pour trouver un point. À l'intérieur d'un "
+          + "bâtiment c'est fréquent : réessayez près d'une fenêtre, ou dehors.");
+      }
+      annoncer('Position introuvable.');
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
 function majBoutonAide() {
   $('#btn-aide-sous').textContent = reglages.nom
     ? 'Prévenir ' + reglages.nom
@@ -711,6 +1011,15 @@ function initReglages() {
   lierCase('#r-ouvrir-sms', 'aideOuvreSms');
   lierCase('#r-afficher-carte', 'aideAfficheCarte');
   lierCase('#r-bouclier-auto', 'aideActiveBouclier');
+
+  /* Allumer l'interrupteur déclenche aussitôt le test : c'est ainsi que
+     l'autorisation est demandée ici, et nulle part ailleurs. */
+  lierCase('#r-position', 'aideJointPosition', () => {
+    if (reglages.aideJointPosition) testerPosition();
+    else afficherEtatPosition();
+  });
+  $('#btn-tester-position').addEventListener('click', testerPosition);
+  afficherEtatPosition();
 
   choixUnique('choix-taille', (b) => {
     reglages.echelle = Number(b.dataset.echelle);

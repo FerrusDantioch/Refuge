@@ -25,6 +25,15 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
 - **Ne jamais envoyer quoi que ce soit automatiquement** (SMS, appel).
   L'application pré-remplit et ouvre l'application native ; le dernier geste
   appartient toujours à un humain.
+- **Position : jamais de demande d'autorisation pendant une crise.** Une boîte
+  de dialogue système qui surgit au mauvais moment, un appui de travers sur
+  « Bloquer », et la fonction est perdue définitivement. L'autorisation se
+  demande uniquement depuis Réglages (bouton « Tester ma position »), la
+  fonction est **éteinte par défaut**, et si l'autorisation n'est pas déjà
+  accordée au moment de la crise, `position.demarrer()` renonce en silence.
+  Corollaire : **le SMS n'attend jamais la position**. La recherche démarre à
+  l'ouverture de la carte, `ouvrirSms()` reste strictement synchrone, et le
+  point est oublié à la fermeture (il ne doit jamais resservir ailleurs).
 - **Ce n'est pas un dispositif médical.** Garder visible la mention des numéros
   d'urgence français (15 / 112).
 

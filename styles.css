@@ -376,6 +376,12 @@ html[data-bouclier="on"] .cercle {
   color: var(--texte);
 }
 html[data-bouclier="on"] .avis { background: #0a0a0a; border-color: var(--bord); }
+
+/* Ligne de transparence de la carte SOS : ce qui partira avec le SMS.
+   Quand le bouton de retrait est masqué, le texte ne doit pas laisser
+   un blanc en bas de l'encadré. */
+#sos-position p { margin-bottom: 12px; }
+#sos-position p:last-child { margin-bottom: 0; }
 .vide { color: var(--texte-doux); text-align: center; padding: 36px 12px; }
 .masque { display: none !important; }
 
