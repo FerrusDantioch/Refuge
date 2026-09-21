@@ -4,6 +4,10 @@ Application web (PWA) d'aide aux crises de surcharge sensorielle.
 Fonctionne hors-ligne, sans compte, sans traceur. Toutes les données restent
 sur le téléphone.
 
+Ce guide explique comment publier et modifier Refuge **entièrement depuis un
+téléphone Android**, via l'interface web de GitHub, sans ordinateur ni ligne
+de commande.
+
 ## Publier cette application (depuis un téléphone Android)
 
 ### 1. Créer le dépôt
@@ -28,6 +32,8 @@ sur le téléphone.
 
 > ⚠️ Les fichiers doivent être **à la racine** du dépôt, pas dans un
 > sous-dossier. C'est pour cela que cette version n'a pas de dossier `icons/`.
+> L'envoi depuis un téléphone ne sait pas créer de sous-dossier : prenez
+> toujours la variante **à plat**.
 
 ### 3. Activer GitHub Pages
 
@@ -72,13 +78,32 @@ republie.
 
 ---
 
+## Mettre à jour une application déjà publiée
+
+Si Refuge est déjà en ligne et que vous voulez installer une nouvelle version
+(par exemple passer de la v1 à la v2) :
+
+1. Décompressez la nouvelle archive sur le téléphone.
+2. Sur votre dépôt GitHub : **Add file** → **Upload files**.
+3. Sélectionnez les **mêmes 8 fichiers** que la première fois. GitHub
+   **remplace** les anciens automatiquement : il n'y a rien à supprimer.
+4. **Commit changes**, puis attendez 1 à 2 minutes.
+5. Sur le téléphone, ouvrez l'application et **fermez-la complètement**
+   (bouton carré d'Android → balayer la fenêtre), puis rouvrez-la. La nouvelle
+   version s'installe au second lancement.
+
+Vos données ne sont pas touchées : le journal, les réglages, le protocole et
+les liens vivent dans le téléphone, pas dans les fichiers du dépôt.
+
+---
+
 ## Les fichiers
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | Les 4 écrans et **tous les textes affichés** |
+| `index.html` | Les 5 écrans et **tous les textes affichés** |
 | `styles.css` | Couleurs, tailles, les 3 thèmes (tout est en haut du fichier) |
-| `app.js` | Le comportement : boutons, journal, respiration |
+| `app.js` | Le comportement : boutons, protocole, carte image, liens, journal, respiration |
 | `sw.js` | Le mode hors-ligne |
 | `manifest.json` | Nom et icône de l'application |
 | `icon-192.png` `icon-512.png` `maskable-512.png` | Les icônes |
@@ -108,4 +133,4 @@ appui sur « Envoyer »), et accompagne les deux autres gestes par des guides
 visuels.
 
 Refuge n'est pas un dispositif médical. En cas de danger vital : **15** (SAMU)
-ou **112**.
+ou **112**. **114** par SMS pour qui ne peut pas parler.

@@ -26,6 +26,12 @@
   --rayon: 20px;
   --duree: 300ms;           /* toutes les transitions, volontairement lentes */
   --echelle: 1;             /* taille de police, pilotée par les reglages */
+
+  /* Indispensable : sans cette ligne, le navigateur dessine les cases à
+     cocher et les champs avec SON habillage clair — des carrés blanc pur
+     sur fond sombre. Avec quarante propositions à l'écran, cela fait un
+     mur de blanc, exactement ce que cette application refuse. */
+  color-scheme: dark;
 }
 
 html[data-theme="clair"] {
@@ -40,6 +46,7 @@ html[data-theme="clair"] {
   --aide-fond:   #f0dcd2;
   --aide-bord:   #c08e78;
   --aide-texte:  #5a3a2c;
+  color-scheme: light;      /* thème beige : habillage clair du navigateur */
 }
 
 /* Thème BOUCLIER : noir absolu #000 (pixels OLED éteints = batterie
@@ -57,6 +64,7 @@ html[data-bouclier="on"] {
   --aide-bord:   #4a413d;
   --aide-texte:  #8a7f79;
   --duree: 0ms;             /* plus aucune transition en crise */
+  color-scheme: dark;       /* même en thème clair, le bouclier reste noir */
 }
 
 /* En bouclier, le Journal reste lisible : contraste doux mais suffisant. */
@@ -228,6 +236,7 @@ html[data-bouclier="on"] .onglet[aria-selected="true"] { color: var(--texte); ba
 label { display: block; margin-bottom: 8px; color: var(--texte-doux); font-size: 0.92rem; }
 
 input[type="text"], input[type="tel"], input[type="number"],
+input[type="url"], input[type="email"],
 input[type="datetime-local"], textarea, select {
   font: inherit;
   width: 100%;
@@ -429,3 +438,100 @@ html[data-bouclier="on"] .avis { background: #0a0a0a; border-color: var(--bord);
   position: absolute; width: 1px; height: 1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
+
+/* ============================================================
+   12. MON PROTOCOLE (v2)
+   Une liste de cases à cocher qui doit rester lisible et
+   confortable : chaque ligne fait au moins 60 px de haut, la
+   case elle-même 30 px, et toute la ligne est cliquable.
+   ============================================================ */
+
+.proposition {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 10px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--bord);
+  color: var(--texte);
+  font-size: 0.98rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.proposition:last-of-type { border-bottom: none; }
+.proposition input {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  margin: 0;
+}
+.proposition span { flex: 1; }
+/* Une ligne cochée s'épaissit : on voit d'un coup d'œil ce qui ira
+   sur la carte, sans couleur criarde ni pastille clignotante. */
+.proposition:has(input:checked) span { font-weight: 600; }
+
+/* Le champ libre de chaque thème : plus court qu'une vraie note,
+   c'est une ligne ou deux à ajouter aux propositions. */
+.champ-libre { min-height: 84px; margin-bottom: 4px; }
+
+/* En bouclier, le navigateur dessine la coche en blanc pour la faire
+   ressortir — c'est le seul pixel lumineux d'un écran volontairement
+   noir. On assombrit donc toutes les cases : elles restent lisibles,
+   sans trouer l'obscurité. */
+html[data-bouclier="on"] .proposition input,
+html[data-bouclier="on"] .interrupteur input { filter: brightness(0.55); }
+
+/* ---------- Aperçu de la carte ---------- */
+
+#apercu-carte { max-width: 340px; margin: 0 auto 20px; }
+#apercu-carte canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--bord);
+  border-radius: 14px;
+}
+
+/* Les deux nouveaux écrans pleine page sont des listes qui défilent :
+   comme les numéros d'urgence, ils partent du haut. */
+.carte-sos.defile { justify-content: flex-start; }
+.carte-sos.defile h2 { font-size: 1.3rem; margin-bottom: 10px; }
+.carte-sos.defile .intro { color: var(--texte-doux); margin-bottom: 22px; }
+.carte-sos.defile ol.etapes { margin-bottom: 18px; }
+
+/* ============================================================
+   13. LIENS APAISANTS (v2)
+   ============================================================ */
+
+/* Le formulaire d'ajout ne doit pas coller au premier lien de la liste. */
+#form-lien { margin-bottom: 22px; }
+
+.lien {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.lien .nom { font-weight: 600; margin-bottom: 4px; }
+.lien .adresse {
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+.lien .bouton-rangee button { min-height: 60px; }
+/* Un bouton armé attend le second appui, comme pour les urgences. */
+.lien button.arme { background: var(--accent-fond); border-color: var(--accent); }
+html[data-bouclier="on"] .lien button.arme { background: #101010; border-color: #5a5a5a; }
+
+/* ============================================================
+   14. BARRE D'ONGLETS À CINQ ENTRÉES (v2)
+   Un onglet de plus : on resserre un peu le texte pour que
+   « Protocole » et « Réglages » tiennent sur un écran étroit,
+   sans jamais descendre sous 68 px de hauteur tactile.
+   ============================================================ */
+.onglet { font-size: 0.72rem; padding: 8px 2px; gap: 4px; }
+.onglet svg { width: 22px; height: 22px; }
