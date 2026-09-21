@@ -5,3 +5,6 @@
 
 # Fichiers binaires : Git ne doit surtout pas y toucher.
 *.png binary
+
+# Archives de livraison : binaires, Git ne doit pas y toucher.
+*.zip binary

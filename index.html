@@ -42,6 +42,10 @@
 
     <button id="btn-urgences" style="margin-bottom:16px">Numéros d'urgence</button>
 
+    <!-- Entrée vers les liens apaisants. Masquée dès que le bouclier
+         sensoriel s'allume : en crise, on ne propose plus d'écrans. -->
+    <button id="btn-liens" class="entree-liens" style="margin-bottom:16px">Ce qui m'apaise</button>
+
     <!-- Guides affichés uniquement quand le bouclier est actif -->
     <div id="guides-bouclier" class="carte masque">
       <h2>Vous êtes en sécurité. Trois gestes.</h2>
@@ -138,6 +142,9 @@
       <p><small>Tout est stocké uniquement sur ce téléphone. Rien n'est envoyé
          sur internet. Vous pouvez exporter une copie pour vous, ou pour la
          montrer à un professionnel.</small></p>
+      <p><small>La sauvegarde JSON contient aussi votre protocole et vos
+         liens : c'est elle qu'il faut garder avant de changer de
+         téléphone.</small></p>
       <div class="bouton-rangee">
         <button type="button" id="btn-export-csv">Exporter (CSV)</button>
         <button type="button" id="btn-export-json">Sauvegarde (JSON)</button>
@@ -181,13 +188,69 @@
       </div>
     </div>
 
+    <button type="button" class="entree-liens" style="margin-bottom:16px">Ce qui m'apaise</button>
+
     <p><small>Si suivre le cercle demande trop d'effort, fermez les yeux et
        suivez seulement les mots. Si c'est encore trop, posez le téléphone :
        ne rien faire est aussi une réponse valable.</small></p>
   </section>
 
   <!-- ========================================================
-       VUE 4 — RÉGLAGES
+       VUE 4 — MON PROTOCOLE
+       Ce que je veux que les gens sachent pendant une crise.
+       La liste est construite par app.js (THEMES_PROTOCOLE) :
+       ajouter une proposition se fait là-bas, en une ligne.
+       ======================================================== -->
+  <section id="vue-protocole" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-protocole" hidden>
+    <h1>Mon protocole</h1>
+
+    <p><small>Cochez ce qui vous aide pendant une crise. Ce sont vos mots, pas
+       des consignes médicales : ils servent à renseigner les personnes autour
+       de vous quand parler devient impossible. Tout reste sur ce téléphone,
+       et chaque case est enregistrée toute seule.</small></p>
+
+    <div id="protocole-themes"></div>
+
+    <div class="carte">
+      <h2>Qui prévenir</h2>
+      <p><small>Facultatif. Ce nom et ce numéro apparaîtront en bas de votre
+         carte, sous les lignes cochées.</small></p>
+
+      <label for="p-contact-nom">Son nom</label>
+      <input type="text" id="p-contact-nom" placeholder="Par exemple : Maman, Sam" autocomplete="name">
+
+      <label for="p-contact-tel">Son numéro</label>
+      <input type="tel" id="p-contact-tel" placeholder="06 12 34 56 78" autocomplete="tel">
+
+      <button type="button" id="btn-reprendre-contact">
+        Reprendre le contact des Réglages
+      </button>
+    </div>
+
+    <div class="carte">
+      <h2>Ma carte pour l'écran verrouillé</h2>
+      <p><small>Refuge fabrique une image à partir des lignes cochées. Posée en
+         fond d'écran verrouillé, elle parle à votre place, même téléphone
+         fermé, même batterie presque vide.</small></p>
+
+      <p class="avis">Ce texte sera visible par tout le monde, même téléphone
+         verrouillé. Vérifie ce que tu y mets.</p>
+
+      <h3>Fond de la carte</h3>
+      <div class="choix" id="choix-fond-carte" role="group" aria-label="Fond de la carte">
+        <button type="button" data-fond="sombre" aria-pressed="true">Fond sombre</button>
+        <button type="button" data-fond="clair">Fond clair</button>
+      </div>
+      <p><small>Le fond sombre fatigue moins les yeux la nuit et économise la
+         batterie ; le fond clair se lit mieux en plein soleil.</small></p>
+
+      <button type="button" id="btn-creer-carte" class="bouton-doux">Créer ma carte</button>
+      <p id="p-resume"><small></small></p>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       VUE 5 — RÉGLAGES
        ======================================================== -->
   <section id="vue-reglages" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-reglages" hidden>
     <h1>Réglages</h1>
@@ -298,7 +361,7 @@
          calme : savoir à l'avance qui répond et ce qu'on vous demandera enlève
          une inconnue le jour où ça compte.</small></p>
 
-      <p><small>Version 1.2</small></p>
+      <p><small>Version 2.0</small></p>
     </div>
   </section>
 
@@ -315,6 +378,11 @@
           aria-controls="vue-respiration" data-vue="respiration">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>
     Respirer
+  </button>
+  <button class="onglet" id="onglet-protocole" role="tab" aria-selected="false"
+          aria-controls="vue-protocole" data-vue="protocole">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3 6.2l1.3 1.3L6.9 5"/><path d="M3 12.2l1.3 1.3L6.9 11"/><path d="M3 18.2l1.3 1.3L6.9 17"/></svg>
+    Protocole
   </button>
   <button class="onglet" id="onglet-journal" role="tab" aria-selected="false"
           aria-controls="vue-journal" data-vue="journal">
@@ -412,6 +480,108 @@
 
   <div class="pied">
     <button type="button" id="urgences-fermer">Fermer</button>
+  </div>
+</div>
+
+<!-- ====== Carte de protocole : avertissement, puis aperçu ======
+     Deux temps volontaires. Le premier écran ne montre aucune image :
+     il dit seulement ce qui va être écrit et qui pourra le lire. On ne
+     fabrique rien tant que ce n'est pas confirmé. -->
+<div id="ecran-carte" class="carte-sos defile lisible-en-bouclier" hidden tabindex="-1"
+     role="dialog" aria-modal="true" aria-labelledby="carte-titre">
+
+  <h2 id="carte-titre">Ma carte de protocole</h2>
+
+  <div id="carte-etape-avis">
+    <p class="avis"><strong>Ce texte sera visible par tout le monde, même
+       téléphone verrouillé. Vérifie ce que tu y mets.</strong></p>
+
+    <p>La carte contiendra : <span id="carte-detail"></span></p>
+
+    <p id="carte-avis-numero" class="masque"><small>Un numéro de téléphone posé
+       sur un écran verrouillé est lisible par n'importe qui — y compris par
+       quelqu'un qui n'a rien à y faire. Si cela vous gêne, retirez-le dans
+       « Qui prévenir » : la carte reste utile sans lui.</small></p>
+
+    <p><small>Rien n'est envoyé nulle part : l'image est fabriquée par ce
+       téléphone, et reste dessus tant que vous ne la partagez pas.</small></p>
+
+    <div class="bouton-rangee">
+      <button type="button" id="carte-annuler">Annuler</button>
+      <button type="button" id="carte-confirmer" class="bouton-doux">Créer la carte</button>
+    </div>
+  </div>
+
+  <div id="carte-etape-apercu" class="masque">
+    <p><small>Voici votre carte. Regardez-la en entier avant de la poser en
+       fond d'écran.</small></p>
+
+    <div id="apercu-carte"></div>
+
+    <p id="carte-alerte" class="avis masque" role="status"></p>
+
+    <button type="button" id="carte-telecharger" class="bouton-doux" style="margin-bottom:12px">
+      Télécharger l'image
+    </button>
+    <button type="button" id="carte-partager" class="masque" style="margin-bottom:12px">
+      Partager l'image
+    </button>
+
+    <h3>La mettre en écran verrouillé (Redmi / Xiaomi)</h3>
+    <ol class="etapes">
+      <li>Touchez « Télécharger l'image » : elle arrive dans l'application
+          <strong>Galerie</strong>, album « Téléchargements ».</li>
+      <li>Ouvrez la Galerie, puis l'image.</li>
+      <li>Touchez <strong>⋮</strong> (ou « Plus ») en bas à droite, puis
+          <strong>Définir comme fond d'écran</strong>.</li>
+      <li>Choisissez <strong>Écran de verrouillage</strong> — pas l'écran
+          d'accueil.</li>
+      <li>Ne recadrez pas : reculez l'image jusqu'à voir tout le texte, puis
+          <strong>Appliquer</strong>.</li>
+    </ol>
+    <p><small>Si le fond d'écran change tout seul au bout de quelques heures,
+       c'est le « Carrousel » de Xiaomi : Réglages → Fond d'écran → Carrousel
+       de fonds d'écran → éteindre.</small></p>
+    <p><small>L'heure et les notifications se posent par-dessus l'image : les
+       premières lignes sont volontairement placées assez bas pour rester
+       lisibles.</small></p>
+
+    <button type="button" id="carte-fermer">Fermer</button>
+  </div>
+</div>
+
+<!-- ====== Liens apaisants ======
+     Volontairement absent quand le bouclier sensoriel est actif : en
+     crise, le bouton n'apparaît nulle part et l'écran se referme. Le
+     bouclier, c'est le silence, pas un menu de plus. -->
+<div id="ecran-liens" class="carte-sos defile lisible-en-bouclier" hidden tabindex="-1"
+     role="dialog" aria-modal="true" aria-labelledby="liens-titre">
+
+  <h2 id="liens-titre">Ce qui m'apaise</h2>
+  <p class="intro">Vos playlists, livres audio, podcasts, vidéos. Refuge garde
+     seulement leur nom et leur adresse, sur ce téléphone. Il n'ouvre rien tout
+     seul et ne lit rien : c'est vous qui décidez, à chaque fois.</p>
+
+  <form id="form-lien" novalidate>
+    <label for="l-nom">Nom du lien</label>
+    <input type="text" id="l-nom" placeholder="Ma playlist du soir">
+
+    <label for="l-url">Adresse (elle doit commencer par https://)</label>
+    <input type="url" id="l-url" inputmode="url" placeholder="https://…" autocapitalize="none" spellcheck="false">
+
+    <p id="l-erreur" class="avis masque" role="alert"></p>
+
+    <button type="submit" class="bouton-doux">Ajouter ce lien</button>
+  </form>
+
+  <div id="liste-liens"></div>
+
+  <p><small>Ouvrir un lien quitte Refuge, ouvre internet et peut consommer des
+     données. L'ouverture demande deux appuis : le premier arme le bouton, le
+     second ouvre vraiment.</small></p>
+
+  <div class="pied">
+    <button type="button" id="liens-fermer">Fermer</button>
   </div>
 </div>
 

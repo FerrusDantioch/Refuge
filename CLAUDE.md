@@ -4,6 +4,10 @@ PWA d'aide aux personnes autistes pendant une crise de surcharge sensorielle, en
 **HTML/CSS/JS pur, sans dépendance ni compilation**. L'utilisateur cible s'en
 sert au moment où la parole et la motricité fine deviennent difficiles.
 
+Cinq écrans : Accueil, Respirer, Protocole, Journal, Réglages — plus trois
+écrans plein écran (message à montrer, numéros d'urgence, liens apaisants) et
+l'écran de fabrication de la carte.
+
 ## ⚠️ Contraintes de conception : à préserver, pas à rediscuter
 
 Ces règles ont été construites délibérément et sont critiques pour la sécurité
@@ -36,6 +40,29 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   point est oublié à la fermeture (il ne doit jamais resservir ailleurs).
 - **Ce n'est pas un dispositif médical.** Garder visible la mention des numéros
   d'urgence français (15 / 112).
+- **Protocole : de l'information, jamais une consigne médicale.** Les
+  propositions sont écrites à la première personne (« Ne pas me toucher »,
+  « Je vous entends même sans répondre »). Elles décrivent ce qui aide *cette
+  personne* ; elles ne prescrivent rien à qui que ce soit. Toute proposition
+  ajoutée doit garder cette forme. Les `id` de `THEMES_PROTOCOLE` sont la clé
+  de stockage : **ne jamais en modifier un déjà publié**, sinon la case se
+  décoche chez les gens.
+- **Carte pour l'écran verrouillé : avertissement obligatoire avant
+  fabrication.** Un écran verrouillé se lit sans déverrouiller le téléphone,
+  donc par n'importe qui, y compris quelqu'un de mal intentionné. L'image
+  n'est jamais fabriquée avant confirmation explicite, et le numéro du contact
+  y est facultatif. Les zones haute (360 px) et basse (210 px) de l'image
+  restent vides : l'horloge et les notifications d'Android s'y posent.
+- **Liens apaisants : `https://` uniquement, deux appuis, et rien en
+  bouclier.** L'adresse est validée par `new URL()` + `protocol === 'https:'`.
+  L'ouverture se fait dans un nouvel onglet, après une confirmation. Dès que
+  le bouclier sensoriel s'allume, les boutons d'entrée disparaissent et
+  l'écran se referme : le bouclier, c'est le silence, pas un menu de plus.
+- **IndexedDB : migration additive uniquement.** `onupgradeneeded` ne crée que
+  les tiroirs manquants (`objectStoreNames.contains`). Un tiroir existant
+  n'est jamais recréé ni vidé : le journal d'une ancienne version doit
+  toujours survivre. Nouveau tiroir = version +1 et un bloc `if (!contains)`
+  de plus, sans toucher aux précédents.
 - **Carte « Numéros d'urgence » : deux appuis pour appeler.** Elle sert d'abord
   à *anticiper* — savoir qui répond et ce qu'on demandera — pas à composer vite.
   D'où le texte qui accompagne chaque numéro, et le 114 (urgences par SMS, pour
@@ -52,7 +79,7 @@ Après toute modification d'un fichier **mis en cache** (`index.html`, `app.js`,
 `sw.js` :
 
 ```js
-const CACHE = 'refuge-v5';   // → v6
+const CACHE = 'refuge-v8';   // → v9
 ```
 
 Sans ce changement, le navigateur ne retélécharge rien et **toute personne ayant

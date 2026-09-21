@@ -109,6 +109,13 @@ function activerBouclier(actif) {
   btn.textContent = actif ? 'Quitter le bouclier' : 'Bouclier sensoriel';
 
   $('#guides-bouclier').classList.toggle('masque', !actif);
+
+  /* Les liens apaisants disparaissent en bouclier — bouton compris.
+     Le bouclier, c'est le silence total : aucune playlist, aucune vidéo,
+     rien à choisir. L'écran se referme s'il était ouvert. */
+  $$('.entree-liens').forEach((b) => b.classList.toggle('masque', actif));
+  if (actif && !$('#ecran-liens').hidden) ouvrirEcranLiens(false);
+
   majCouleurBarre();
   annoncer(actif
     ? 'Bouclier sensoriel activé. Écran noir, application silencieuse.'
@@ -563,33 +570,90 @@ $$('#carte-urgences button[data-appel]').forEach((b) => {
 const BDD = {
   base: null,
 
+  /* ------------------------------------------------------------
+     MIGRATION v1 → v2, sans perte de données
+     ------------------------------------------------------------
+     IndexedDB fonctionne par numéro de version. La v1 de Refuge ne
+     connaissait qu'un seul tiroir : « crises ». La v2 en ajoute deux,
+     « protocole » et « liens ».
+
+     La règle d'or est ici : on n'ouvre JAMAIS un tiroir existant pour
+     le recréer. onupgradeneeded ne crée que ce qui manque
+     (objectStoreNames.contains). Un journal écrit avec la v1 est donc
+     retrouvé intact après la mise à jour — le navigateur se contente
+     d'ajouter les deux tiroirs vides à côté.
+
+     Conséquence pratique : si vous ajoutez un jour un troisième tiroir,
+     montez VERSION_BDD d'un cran et ajoutez un bloc « if (!contains) »
+     ci-dessous. Ne touchez pas aux blocs déjà écrits.
+     ------------------------------------------------------------ */
+
   ouvrir() {
     return new Promise((resoudre, rejeter) => {
-      const demande = indexedDB.open('refuge', 1);
+      const demande = indexedDB.open('refuge', 2);
+
       demande.onupgradeneeded = () => {
         const b = demande.result;
+
+        /* v1 — le journal de crises. Recréé seulement s'il n'existe pas
+           (première installation) : sinon, on n'y touche pas. */
         if (!b.objectStoreNames.contains('crises')) {
           const magasin = b.createObjectStore('crises', { keyPath: 'id', autoIncrement: true });
           magasin.createIndex('parDate', 'ts');
         }
+
+        /* v2 — le protocole. Un seul enregistrement, rangé sous la clé
+           'moi' : pas de keyPath, la clé est donnée à l'écriture. */
+        if (!b.objectStoreNames.contains('protocole')) {
+          b.createObjectStore('protocole');
+        }
+
+        /* v2 — les liens apaisants, numérotés automatiquement. */
+        if (!b.objectStoreNames.contains('liens')) {
+          b.createObjectStore('liens', { keyPath: 'id', autoIncrement: true });
+        }
       };
+
+      /* Un autre onglet de Refuge, resté ouvert sur l'ancienne version,
+         peut bloquer la mise à jour. On le dit clairement plutôt que
+         d'attendre sans fin. */
+      demande.onblocked = () => {
+        console.warn('Mise à jour de la base bloquée : fermez les autres onglets de Refuge.');
+      };
+
       demande.onsuccess = () => { BDD.base = demande.result; resoudre(BDD.base); };
       demande.onerror = () => rejeter(demande.error);
     });
   },
 
-  operation(mode, action) {
+  /* Une seule petite mécanique pour tous les tiroirs. Si la base n'a pas
+     pu s'ouvrir, on rejette proprement : l'appelant affiche un message
+     plutôt que de planter. */
+  operation(tiroir, mode, action) {
     return new Promise((resoudre, rejeter) => {
-      const t = BDD.base.transaction('crises', mode);
-      const r = action(t.objectStore('crises'));
-      t.oncomplete = () => resoudre(r && r.result);
-      t.onerror = () => rejeter(t.error);
+      if (!BDD.base) { rejeter(new Error('Base locale indisponible')); return; }
+      try {
+        const t = BDD.base.transaction(tiroir, mode);
+        const r = action(t.objectStore(tiroir));
+        t.oncomplete = () => resoudre(r && r.result);
+        t.onerror = () => rejeter(t.error);
+      } catch (e) { rejeter(e); }
     });
   },
 
-  ajouter(entree) { return BDD.operation('readwrite', (m) => m.add(entree)); },
-  supprimer(id)   { return BDD.operation('readwrite', (m) => m.delete(id)); },
-  tout()          { return BDD.operation('readonly',  (m) => m.getAll()); }
+  /* --- Journal de crises (inchangé depuis la v1) --- */
+  ajouter(entree) { return BDD.operation('crises', 'readwrite', (m) => m.add(entree)); },
+  supprimer(id)   { return BDD.operation('crises', 'readwrite', (m) => m.delete(id)); },
+  tout()          { return BDD.operation('crises', 'readonly',  (m) => m.getAll()); },
+
+  /* --- Protocole : un unique enregistrement --- */
+  lireProtocole()      { return BDD.operation('protocole', 'readonly',  (m) => m.get('moi')); },
+  ecrireProtocole(val) { return BDD.operation('protocole', 'readwrite', (m) => m.put(val, 'moi')); },
+
+  /* --- Liens apaisants --- */
+  liensTout()        { return BDD.operation('liens', 'readonly',  (m) => m.getAll()); },
+  liensAjouter(l)    { return BDD.operation('liens', 'readwrite', (m) => m.add(l)); },
+  liensSupprimer(id) { return BDD.operation('liens', 'readwrite', (m) => m.delete(id)); }
 };
 
 /* --- État du formulaire d'ajout --- */
@@ -788,7 +852,18 @@ $('#btn-export-csv').addEventListener('click', async () => {
 });
 
 $('#btn-export-json').addEventListener('click', async () => {
-  const donnees = { version: 1, exporte: new Date().toISOString(), crises: await BDD.tout() };
+  /* Depuis la v2, la sauvegarde contient aussi le protocole et les liens :
+     c'est le seul fichier à garder avant de changer de téléphone. */
+  let liens = [];
+  try { liens = await BDD.liensTout(); } catch (e) { console.warn('Liens illisibles.', e); }
+
+  const donnees = {
+    version: 2,
+    exporte: new Date().toISOString(),
+    crises: await BDD.tout(),
+    protocole: protocole,
+    liens: liens
+  };
   telecharger('sauvegarde-refuge.json', JSON.stringify(donnees, null, 2), 'application/json');
 });
 
@@ -1130,7 +1205,800 @@ function initReglages() {
 
 
 /* ============================================================
-   9. DÉMARRAGE
+   9. MON PROTOCOLE — « voici ce qui m'aide »
+   ------------------------------------------------------------
+   Une liste de cases à cocher, rangée par thèmes. Rien ici n'est une
+   consigne médicale : ce sont VOS phrases, à la première personne,
+   destinées aux gens qui seront autour de vous quand parler devient
+   impossible. Elles informent, elles ne prescrivent pas.
+
+   POUR AJOUTER UNE PROPOSITION PLUS TARD
+   --------------------------------------
+   Ajoutez une ligne { id: '…', texte: '…' } dans le thème voulu,
+   ci-dessous. C'est tout : l'écran et la carte se mettent à jour
+   tout seuls.
+
+   L'« id » est l'étiquette qui sert à retenir votre choix dans la
+   base. Trois règles :
+     • il doit être unique dans toute la liste ;
+     • écrivez-le en minuscules, sans accent ni espace ;
+     • ne modifiez JAMAIS l'id d'une proposition déjà en place —
+       sinon la case correspondante se décocherait toute seule.
+   Le texte, lui, peut être réécrit quand vous voulez.
+
+   Pour créer un thème entier, copiez un bloc { id, titre, aide,
+   propositions: [...] } complet : un nouvel encadré apparaîtra, avec
+   son propre champ libre.
+   ============================================================ */
+
+const THEMES_PROTOCOLE = [
+  {
+    id: 'contact',
+    titre: 'Contact et présence',
+    aide: "Ce que je voudrais que les gens fassent — ou ne fassent pas — avec leur corps.",
+    propositions: [
+      { id: 'contact-pas-toucher',      texte: 'Ne pas me toucher' },
+      { id: 'contact-prevenir-avant',   texte: "Me prévenir avant de me toucher, si c'est vraiment nécessaire" },
+      { id: 'contact-pas-tirer',        texte: 'Ne pas me prendre par le bras pour me déplacer' },
+      { id: 'contact-distance',         texte: 'Rester à quelques pas de moi' },
+      { id: 'contact-rester-silence',   texte: 'Rester près de moi sans rien dire' },
+      { id: 'contact-pas-penche',       texte: 'Ne pas se pencher au-dessus de moi' },
+      { id: 'contact-pas-regard',       texte: "Ne pas chercher mon regard : regarder ailleurs m'aide à écouter" },
+      { id: 'contact-pas-attroupement', texte: "Ne pas faire venir d'autres personnes autour de moi" }
+    ]
+  },
+  {
+    id: 'parole',
+    titre: 'Parole et questions',
+    aide: "Comment me parler, et à quoi je peux répondre.",
+    propositions: [
+      { id: 'parole-doucement',      texte: 'Me parler doucement et peu' },
+      { id: 'parole-phrases-courtes', texte: 'Des phrases courtes, une seule question à la fois' },
+      { id: 'parole-jentends',       texte: 'Je vous entends même sans répondre' },
+      { id: 'parole-temps',          texte: 'Me laisser du temps : ma réponse peut mettre une minute à venir' },
+      { id: 'parole-pas-repeter',    texte: 'Ne pas répéter la question : cela me fait tout recommencer' },
+      { id: 'parole-oui-non',        texte: 'Je peux répondre oui ou non de la tête' },
+      { id: 'parole-ecrire',         texte: "Écrire ou montrer du doigt m'est plus facile que parler" },
+      { id: 'parole-pas-crier',      texte: "Ne pas hausser la voix : je ne fais pas exprès" },
+      { id: 'parole-pas-choisir',    texte: 'Ne pas me demander de choisir : décider est ce qui me coûte le plus' }
+    ]
+  },
+  {
+    id: 'environnement',
+    titre: 'Autour de moi',
+    aide: "Ce qui, dans le lieu, peut être changé tout de suite.",
+    propositions: [
+      { id: 'env-eloigner-bruit',  texte: "M'éloigner du bruit et de la foule" },
+      { id: 'env-lumiere',         texte: 'Baisser la lumière, éteindre les néons' },
+      { id: 'env-coin-calme',      texte: 'Me laisser dans un coin, dos au mur' },
+      { id: 'env-couper-sons',     texte: 'Couper la musique, la télévision, la radio' },
+      { id: 'env-odeurs',          texte: 'Éviter les odeurs fortes : parfum, nourriture, tabac' },
+      { id: 'env-air',             texte: "M'aider à sortir prendre l'air, ou ouvrir une fenêtre" },
+      { id: 'env-sol',             texte: "Me laisser m'asseoir ou m'allonger par terre" }
+    ]
+  },
+  {
+    id: 'sensoriel',
+    titre: "Ce qui m'apaise",
+    aide: "Mes outils. Ils ont l'air étranges vus de l'extérieur : ils servent.",
+    propositions: [
+      { id: 'sens-casque',     texte: 'Me laisser mettre mon casque ou mes bouchons d’oreilles' },
+      { id: 'sens-lunettes',   texte: "Me laisser mes lunettes de soleil, même à l'intérieur" },
+      { id: 'sens-balancer',   texte: "Me laisser me balancer ou bouger les mains : c'est ce qui me calme" },
+      { id: 'sens-couverture', texte: 'Une couverture ou un vêtement lourd posé sur moi m’aide' },
+      { id: 'sens-eau',        texte: "Un verre d'eau fraîche m'aide" },
+      { id: 'sens-objet',      texte: 'Un objet à manipuler dans les mains m’aide' },
+      { id: 'sens-yeux',       texte: 'Me laisser garder les yeux fermés' },
+      { id: 'sens-telephone',  texte: "Me laisser mon téléphone : c'est avec lui que je communique" }
+    ]
+  },
+  {
+    id: 'autres',
+    titre: 'Ce qu’il faut savoir',
+    aide: "De quoi éviter les malentendus, et les gestes de secours inutiles.",
+    propositions: [
+      { id: 'autre-pas-danger',    texte: 'Je ne suis pas en danger : cela passe avec du calme' },
+      { id: 'autre-pas-epilepsie', texte: "Ce n'est pas une crise d'épilepsie" },
+      { id: 'autre-pas-substance', texte: "Je n'ai ni bu ni pris de drogue" },
+      { id: 'autre-pas-secours',   texte: "Je n'ai pas besoin des secours, sauf si je me blesse" },
+      { id: 'autre-duree',         texte: "J'ai besoin de trente minutes à quelques heures pour revenir" },
+      { id: 'autre-apres',         texte: "Après, j'aurai besoin de repos : ne pas me demander d'expliquer" },
+      { id: 'autre-prevenir',      texte: 'Prévenir la personne dont le nom est en bas de cette carte' },
+      { id: 'autre-signe',         texte: 'Rester à distance jusqu’à ce que je fasse signe' }
+    ]
+  }
+];
+
+/* Ce que Refuge retient de vos choix. « coches » est une liste d'id,
+   « libres » vos propres lignes, thème par thème. */
+let protocole = { coches: [], libres: {}, contactNom: '', contactTel: '' };
+
+/* Le fond choisi pour la carte image (voir section 10). */
+let fondCarte = 'sombre';
+
+/* L'écriture dans la base est différée de quelques centièmes de seconde :
+   taper dans un champ libre déclencherait sinon une écriture par lettre. */
+let minuteurProtocole = null;
+
+function enregistrerProtocole(tout_de_suite) {
+  clearTimeout(minuteurProtocole);
+  const ecrire = () => {
+    BDD.ecrireProtocole({ ...protocole, maj: Date.now() })
+      .catch((e) => console.warn('Protocole non enregistré.', e));
+  };
+  if (tout_de_suite) ecrire();
+  else minuteurProtocole = setTimeout(ecrire, 400);
+}
+
+/* Construit l'écran à partir de THEMES_PROTOCOLE. Tout est généré ici :
+   ajouter une proposition dans la liste suffit à la faire apparaître. */
+function construireProtocole() {
+  const conteneur = $('#protocole-themes');
+  conteneur.innerHTML = '';
+
+  THEMES_PROTOCOLE.forEach((theme) => {
+    const carte = document.createElement('section');
+    carte.className = 'carte';
+
+    const titre = document.createElement('h2');
+    titre.textContent = theme.titre;
+    carte.appendChild(titre);
+
+    if (theme.aide) {
+      const aide = document.createElement('p');
+      aide.innerHTML = '<small></small>';
+      aide.firstChild.textContent = theme.aide;
+      carte.appendChild(aide);
+    }
+
+    theme.propositions.forEach((prop) => {
+      const ligne = document.createElement('label');
+      ligne.className = 'proposition';
+      ligne.setAttribute('for', 'prop-' + prop.id);
+
+      const coche = document.createElement('input');
+      coche.type = 'checkbox';
+      coche.id = 'prop-' + prop.id;
+      coche.dataset.prop = prop.id;
+
+      const texte = document.createElement('span');
+      texte.textContent = prop.texte;
+
+      coche.addEventListener('change', () => {
+        const dedans = protocole.coches.indexOf(prop.id);
+        if (coche.checked && dedans === -1) protocole.coches.push(prop.id);
+        if (!coche.checked && dedans !== -1) protocole.coches.splice(dedans, 1);
+        enregistrerProtocole();
+        majResumeProtocole();
+      });
+
+      ligne.appendChild(coche);
+      ligne.appendChild(texte);
+      carte.appendChild(ligne);
+    });
+
+    /* Le champ libre du thème : une ligne de texte = une ligne sur la carte. */
+    const etiquette = document.createElement('label');
+    etiquette.setAttribute('for', 'libre-' + theme.id);
+    etiquette.textContent = 'Mes propres mots (une ligne par idée)';
+    etiquette.style.marginTop = '14px';
+
+    const champ = document.createElement('textarea');
+    champ.id = 'libre-' + theme.id;
+    champ.className = 'champ-libre';
+    champ.placeholder = 'Facultatif';
+    champ.addEventListener('input', () => {
+      protocole.libres[theme.id] = champ.value;
+      enregistrerProtocole();
+      majResumeProtocole();
+    });
+
+    carte.appendChild(etiquette);
+    carte.appendChild(champ);
+    conteneur.appendChild(carte);
+  });
+}
+
+/* Recopie dans l'écran ce qui a été lu dans la base. */
+function afficherProtocole() {
+  $$('#protocole-themes input[type="checkbox"]').forEach((c) => {
+    c.checked = protocole.coches.includes(c.dataset.prop);
+  });
+  THEMES_PROTOCOLE.forEach((theme) => {
+    const champ = $('#libre-' + theme.id);
+    if (champ) champ.value = protocole.libres[theme.id] || '';
+  });
+  $('#p-contact-nom').value = protocole.contactNom || '';
+  $('#p-contact-tel').value = protocole.contactTel || '';
+  majResumeProtocole();
+}
+
+/* Les lignes libres d'un thème, nettoyées : une par ligne, sans vide. */
+function lignesLibres(idTheme) {
+  return (protocole.libres[idTheme] || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+/* Toutes les lignes qui iront sur la carte, dans l'ordre des thèmes :
+   d'abord les propositions cochées, puis vos propres mots. */
+function lignesProtocole() {
+  const lignes = [];
+  THEMES_PROTOCOLE.forEach((theme) => {
+    theme.propositions.forEach((p) => {
+      if (protocole.coches.includes(p.id)) lignes.push(p.texte);
+    });
+    lignesLibres(theme.id).forEach((l) => lignes.push(l));
+  });
+  return lignes;
+}
+
+/* La ligne « qui prévenir », en bas de la carte. */
+function ligneContact() {
+  const nom = (protocole.contactNom || '').trim();
+  const tel = (protocole.contactTel || '').trim();
+  if (nom && tel) return 'Prévenir ' + nom + ' : ' + tel;
+  if (nom) return 'Prévenir ' + nom;
+  if (tel) return 'Prévenir ce numéro : ' + tel;
+  return '';
+}
+
+function majResumeProtocole() {
+  const total = lignesProtocole().length;
+  const bouton = $('#btn-creer-carte');
+  const resume = $('#p-resume').firstChild;
+
+  bouton.disabled = total === 0;
+  bouton.style.opacity = total === 0 ? '0.5' : '';
+
+  if (total === 0) {
+    resume.textContent = "Cochez au moins une ligne pour pouvoir créer votre carte.";
+  } else {
+    resume.textContent = total + (total > 1 ? ' lignes iront' : ' ligne ira')
+      + ' sur la carte. Huit à douze lignes se lisent d’un coup d’œil ; '
+      + 'au-delà, le texte rapetisse.';
+  }
+}
+
+function initProtocole() {
+  construireProtocole();
+
+  const lierContact = (idChamp, cle) => {
+    const champ = $(idChamp);
+    champ.addEventListener('input', () => {
+      protocole[cle] = champ.value;
+      enregistrerProtocole();
+    });
+  };
+  lierContact('#p-contact-nom', 'contactNom');
+  lierContact('#p-contact-tel', 'contactTel');
+
+  /* Raccourci : reprendre le contact déjà saisi dans les Réglages,
+     plutôt que de le retaper. Les deux restent indépendants ensuite. */
+  $('#btn-reprendre-contact').addEventListener('click', () => {
+    protocole.contactNom = reglages.nom || '';
+    protocole.contactTel = reglages.tel || '';
+    $('#p-contact-nom').value = protocole.contactNom;
+    $('#p-contact-tel').value = protocole.contactTel;
+    enregistrerProtocole(true);
+    annoncer(protocole.contactNom || protocole.contactTel
+      ? 'Contact repris des réglages.'
+      : "Aucun contact n'est enregistré dans les réglages.");
+  });
+
+  choixUnique('choix-fond-carte', (b) => { fondCarte = b.dataset.fond; });
+
+  /* Lecture de ce qui était déjà enregistré. En cas d'échec (base
+     indisponible), l'écran reste utilisable : il est simplement vide. */
+  BDD.lireProtocole()
+    .then((enregistre) => {
+      if (enregistre) {
+        protocole = {
+          coches: Array.isArray(enregistre.coches) ? enregistre.coches : [],
+          libres: enregistre.libres || {},
+          contactNom: enregistre.contactNom || '',
+          contactTel: enregistre.contactTel || ''
+        };
+      }
+      afficherProtocole();
+    })
+    .catch((e) => { console.warn('Protocole illisible.', e); afficherProtocole(); });
+}
+
+
+/* ============================================================
+   10. LA CARTE POUR L'ÉCRAN VERROUILLÉ
+   ------------------------------------------------------------
+   On fabrique une image PNG portrait à partir des lignes cochées.
+   Posée en fond d'écran verrouillé, elle parle à votre place sans
+   qu'on ait à déverrouiller quoi que ce soit.
+
+   Deux précautions inscrites dans le code :
+
+   1. Un avertissement AVANT de fabriquer quoi que ce soit. Un écran
+      verrouillé est public : tout le monde peut le lire, y compris
+      quelqu'un qui n'a rien à y faire. L'image n'existe qu'après
+      confirmation.
+
+   2. Le haut et le bas de l'image restent vides. L'horloge, la date
+      et les notifications d'Android se posent par-dessus : du texte
+      placé là serait illisible au moment où il compte.
+
+   Rien ne sort du téléphone : le dessin est fait par le navigateur,
+   et l'image reste dans l'appareil tant que vous ne la partagez pas.
+   ============================================================ */
+
+const CARTE_IMAGE = {
+  largeur: 1080,
+  hauteur: 1920,
+  marge: 76,
+  hautReserve: 360,   /* zone de l'horloge : on n'y écrit rien */
+  basReserve: 210     /* zone « glisser pour déverrouiller » */
+};
+
+/* Fort contraste, mais jamais du blanc pur sur du noir pur : même ici,
+   on reste dans les gris profonds et les crèmes. */
+const PALETTES_CARTE = {
+  sombre: { fond: '#0d1116', texte: '#eef1f4', doux: '#b3bcc5', trait: '#3a434e' },
+  clair:  { fond: '#faf7f1', texte: '#1a1e23', doux: '#4d545c', trait: '#c7c1b5' }
+};
+
+const FAMILLE_CARTE = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+const TITRE_CARTE = "Je suis autiste, je suis en surcharge sensorielle. "
+  + "Voici ce qui m'aide.";
+
+const PIED_CARTE = "En cas de danger ou de doute : 15 ou 112. "
+  + "114 par SMS si je ne peux pas parler.";
+
+/* Découpe un texte en lignes qui tiennent dans « largeurMax ».
+   Un mot plus large que la ligne (une adresse, par exemple) est coupé
+   lettre par lettre plutôt que de déborder. */
+function envelopper(ctx, texte, largeurMax) {
+  const lignes = [];
+  let courante = '';
+
+  const poser = () => { if (courante) { lignes.push(courante); courante = ''; } };
+
+  String(texte).split(/\s+/).filter(Boolean).forEach((mot) => {
+    if (ctx.measureText(mot).width > largeurMax) {
+      poser();
+      let morceau = '';
+      Array.from(mot).forEach((lettre) => {
+        if (ctx.measureText(morceau + lettre).width > largeurMax && morceau) {
+          lignes.push(morceau);
+          morceau = '';
+        }
+        morceau += lettre;
+      });
+      courante = morceau;
+      return;
+    }
+    const essai = courante ? courante + ' ' + mot : mot;
+    if (ctx.measureText(essai).width <= largeurMax || !courante) courante = essai;
+    else { lignes.push(courante); courante = mot; }
+  });
+
+  poser();
+  return lignes;
+}
+
+/* Prépare la mise en page pour une échelle de texte donnée.
+   Renvoie les blocs à dessiner et le nombre de lignes qui tiennent. */
+function composerCarte(ctx, echelle, lignes, contact) {
+  const largeur = CARTE_IMAGE.largeur - 2 * CARTE_IMAGE.marge;
+  const zone = CARTE_IMAGE.hauteur - CARTE_IMAGE.hautReserve - CARTE_IMAGE.basReserve;
+  const t = (n) => Math.round(n * echelle);
+
+  const polTitre   = '700 ' + t(56) + 'px ' + FAMILLE_CARTE;
+  const polItem    = '500 ' + t(41) + 'px ' + FAMILLE_CARTE;
+  const polContact = '700 ' + t(41) + 'px ' + FAMILLE_CARTE;
+  const polPied    = '400 ' + t(29) + 'px ' + FAMILLE_CARTE;
+
+  /* Le titre, en haut. */
+  ctx.font = polTitre;
+  const titre = {
+    lignes: envelopper(ctx, TITRE_CARTE, largeur),
+    police: polTitre, interligne: t(68), retrait: 0, couleur: 'texte'
+  };
+  const hTitre = titre.lignes.length * titre.interligne + t(46);
+
+  /* Le pied de page, toujours réservé : il est dessiné en bas de la zone. */
+  ctx.font = polPied;
+  const pied = {
+    lignes: envelopper(ctx, PIED_CARTE, largeur),
+    police: polPied, interligne: t(38), retrait: 0, couleur: 'doux'
+  };
+  const hPied = pied.lignes.length * pied.interligne + t(34);
+
+  /* Le contact, juste au-dessus du pied. */
+  let blocContact = null;
+  let hContact = 0;
+  if (contact) {
+    ctx.font = polContact;
+    blocContact = {
+      lignes: envelopper(ctx, contact, largeur),
+      police: polContact, interligne: t(52), retrait: 0, couleur: 'texte'
+    };
+    hContact = blocContact.lignes.length * blocContact.interligne + t(40);
+  }
+
+  /* Ce qui reste appartient aux lignes du protocole. On en pose autant
+     que la place le permet, jamais une ligne coupée en deux. */
+  const budget = zone - hTitre - hPied - hContact;
+  const retrait = t(38);
+  ctx.font = polItem;
+
+  const items = [];
+  let hauteurItems = 0;
+  for (const texte of lignes) {
+    const bloc = {
+      lignes: envelopper(ctx, texte, largeur - retrait),
+      police: polItem, interligne: t(54), retrait: retrait,
+      couleur: 'texte', puce: true
+    };
+    const h = bloc.lignes.length * bloc.interligne + t(16);
+    if (hauteurItems + h > budget) break;
+    items.push(bloc);
+    hauteurItems += h;
+  }
+
+  return { titre, items, contact: blocContact, pied, posees: items.length, t: t };
+}
+
+/* Dessine la carte et renvoie le canvas, plus le nombre de lignes
+   qui n'ont pas pu tenir. */
+function dessinerCarte(nomPalette) {
+  const p = PALETTES_CARTE[nomPalette] || PALETTES_CARTE.sombre;
+  const canvas = document.createElement('canvas');
+  canvas.width = CARTE_IMAGE.largeur;
+  canvas.height = CARTE_IMAGE.hauteur;
+  const ctx = canvas.getContext('2d');
+
+  const lignes = lignesProtocole();
+  const contact = ligneContact();
+
+  /* On essaie d'abord en grand, puis on rapetisse par petits pas
+     jusqu'à ce que tout tienne. En dessous de 0,62 on s'arrête : plus
+     petit ne serait plus lisible à bout de bras. */
+  let mise = null;
+  for (let e = 1; e >= 0.61; e -= 0.05) {
+    mise = composerCarte(ctx, e, lignes, contact);
+    if (mise.posees >= lignes.length) break;
+  }
+
+  ctx.fillStyle = p.fond;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.textBaseline = 'top';
+
+  const x = CARTE_IMAGE.marge;
+  const t = mise.t;
+
+  const poserBloc = (bloc, y) => {
+    ctx.font = bloc.police;
+    ctx.fillStyle = bloc.couleur === 'doux' ? p.doux : p.texte;
+    bloc.lignes.forEach((ligne, i) => {
+      if (bloc.puce && i === 0) ctx.fillText('•', x, y);
+      ctx.fillText(ligne, x + bloc.retrait, y);
+      y += bloc.interligne;
+    });
+    return y;
+  };
+
+  let y = CARTE_IMAGE.hautReserve;
+  y = poserBloc(mise.titre, y) + t(46);
+  mise.items.forEach((bloc) => { y = poserBloc(bloc, y) + t(16); });
+
+  /* Le bas de la carte est ancré, pas posé à la suite : le contact et
+     le rappel des secours sont toujours au même endroit. */
+  let basZone = CARTE_IMAGE.hauteur - CARTE_IMAGE.basReserve;
+  const hPied = mise.pied.lignes.length * mise.pied.interligne;
+  const yPied = basZone - hPied;
+
+  ctx.strokeStyle = p.trait;
+  ctx.lineWidth = 2;
+
+  if (mise.contact) {
+    const hContact = mise.contact.lignes.length * mise.contact.interligne;
+    const yContact = yPied - t(34) - hContact;
+    ctx.beginPath();
+    ctx.moveTo(x, yContact - t(28));
+    ctx.lineTo(CARTE_IMAGE.largeur - x, yContact - t(28));
+    ctx.stroke();
+    poserBloc(mise.contact, yContact);
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(x, yPied - t(22));
+  ctx.lineTo(CARTE_IMAGE.largeur - x, yPied - t(22));
+  ctx.stroke();
+  poserBloc(mise.pied, yPied);
+
+  return { canvas: canvas, oubliees: lignes.length - mise.posees };
+}
+
+/* L'image fabriquée, gardée telle quelle pour le téléchargement et le
+   partage : les deux boutons doivent répondre dans l'instant de l'appui,
+   sans refaire le dessin. */
+let imageCarte = null;   /* { blob, url } */
+
+function ouvrirEcranCarte(ouvert) {
+  const ecran = $('#ecran-carte');
+  ecran.hidden = !ouvert;
+
+  if (ouvert) {
+    /* On revient toujours sur l'avertissement : jamais directement
+       sur l'image de la fois précédente. */
+    $('#carte-etape-avis').classList.remove('masque');
+    $('#carte-etape-apercu').classList.add('masque');
+
+    const lignes = lignesProtocole();
+    const contact = ligneContact();
+    let detail = lignes.length + (lignes.length > 1 ? ' lignes' : ' ligne');
+    detail += contact ? ', puis « ' + contact + ' ».' : '.';
+    $('#carte-detail').textContent = detail;
+
+    /* Prévenir précisément quand un numéro figure sur la carte. */
+    $('#carte-avis-numero').classList
+      .toggle('masque', !(protocole.contactTel || '').trim());
+
+    ecran.focus({ preventScroll: true });
+    ecran.scrollTop = 0;
+    annoncer('Avant de créer la carte : ce texte sera visible par tout le monde.');
+  } else {
+    /* On libère l'image de la mémoire du navigateur. */
+    if (imageCarte && imageCarte.url) URL.revokeObjectURL(imageCarte.url);
+    imageCarte = null;
+    $('#apercu-carte').innerHTML = '';
+    $('#btn-creer-carte').focus();
+  }
+}
+
+function fabriquerCarte() {
+  const resultat = dessinerCarte(fondCarte);
+
+  const apercu = $('#apercu-carte');
+  apercu.innerHTML = '';
+  resultat.canvas.setAttribute('role', 'img');
+  resultat.canvas.setAttribute('aria-label',
+    'Aperçu de la carte : ' + TITRE_CARTE + ' ' + lignesProtocole().join('. '));
+  apercu.appendChild(resultat.canvas);
+
+  const alerte = $('#carte-alerte');
+  if (resultat.oubliees > 0) {
+    alerte.textContent = resultat.oubliees
+      + (resultat.oubliees > 1 ? ' lignes n’ont pas pu tenir' : ' ligne n’a pas pu tenir')
+      + ' sur la carte : elles ne sont pas sur l’image. Décochez-en '
+      + 'quelques-unes pour que tout rentre en grand.';
+    alerte.classList.remove('masque');
+  } else {
+    alerte.classList.add('masque');
+  }
+
+  $('#carte-etape-avis').classList.add('masque');
+  $('#carte-etape-apercu').classList.remove('masque');
+  $('#ecran-carte').scrollTop = 0;
+
+  /* On prépare tout de suite le fichier : le bouton « Partager » ne
+     fonctionne, sur Android, que s'il n'attend rien. */
+  resultat.canvas.toBlob((blob) => {
+    if (!blob) return;
+    if (imageCarte && imageCarte.url) URL.revokeObjectURL(imageCarte.url);
+    imageCarte = { blob: blob, url: URL.createObjectURL(blob) };
+
+    /* Le partage n'est proposé que si le téléphone sait partager un
+       fichier image. Sinon, le téléchargement suffit. */
+    let partageable = false;
+    try {
+      const fichier = new File([blob], 'ma-carte-refuge.png', { type: 'image/png' });
+      partageable = !!(navigator.canShare && navigator.canShare({ files: [fichier] }));
+    } catch (e) { partageable = false; }
+    $('#carte-partager').classList.toggle('masque', !partageable);
+  }, 'image/png');
+
+  annoncer('Carte créée. Vous pouvez la télécharger.');
+}
+
+$('#btn-creer-carte').addEventListener('click', () => ouvrirEcranCarte(true));
+$('#carte-annuler').addEventListener('click', () => ouvrirEcranCarte(false));
+$('#carte-fermer').addEventListener('click', () => ouvrirEcranCarte(false));
+$('#carte-confirmer').addEventListener('click', fabriquerCarte);
+
+$('#carte-telecharger').addEventListener('click', () => {
+  if (!imageCarte) { annoncer("L'image n'est pas encore prête."); return; }
+  const lien = document.createElement('a');
+  lien.href = imageCarte.url;
+  lien.download = 'ma-carte-refuge.png';
+  lien.click();
+  annoncer('Image téléchargée.');
+});
+
+$('#carte-partager').addEventListener('click', () => {
+  if (!imageCarte) return;
+  try {
+    const fichier = new File([imageCarte.blob], 'ma-carte-refuge.png', { type: 'image/png' });
+    navigator.share({ files: [fichier] }).catch(() => { /* partage annulé */ });
+  } catch (e) {
+    console.warn('Partage impossible.', e);
+  }
+});
+
+
+/* ============================================================
+   11. LIENS APAISANTS
+   ------------------------------------------------------------
+   Vos playlists, livres audio, podcasts. Refuge n'en garde que le
+   nom et l'adresse, dans la base locale — il ne les ouvre jamais
+   tout seul et ne lit rien à votre place.
+
+   Trois garde-fous :
+   • seules les adresses en https:// sont acceptées ;
+   • l'ouverture demande deux appuis, comme les numéros d'urgence ;
+   • en bouclier sensoriel, tout disparaît. Le bouclier, c'est le
+     silence : proposer une playlist à ce moment-là serait exactement
+     le contraire de ce qu'on cherche.
+   ============================================================ */
+
+/* Renvoie l'adresse nettoyée si elle est valide et en https, sinon null. */
+function urlHttps(brut) {
+  const texte = String(brut || '').trim();
+  if (!texte) return null;
+  try {
+    const url = new URL(texte);
+    return url.protocol === 'https:' ? url.href : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+let ouvreurLiens = null;   /* le bouton par lequel on est entré */
+
+function ouvrirEcranLiens(ouvert, depuis) {
+  const ecran = $('#ecran-liens');
+  ecran.hidden = !ouvert;
+  if (ouvert) {
+    ouvreurLiens = depuis || null;
+    afficherLiens();
+    ecran.focus({ preventScroll: true });
+    ecran.scrollTop = 0;
+    annoncer('Ce qui m’apaise.');
+  } else {
+    $('#l-erreur').classList.add('masque');
+    /* On revient sur le bouton d'où l'on vient — pas toujours celui de
+       l'accueil : la respiration en propose un aussi. */
+    if (ouvreurLiens && ouvreurLiens.offsetParent) ouvreurLiens.focus();
+  }
+}
+
+async function afficherLiens() {
+  let liste = [];
+  try { liste = await BDD.liensTout(); } catch (e) { console.warn('Liens illisibles.', e); }
+
+  const conteneur = $('#liste-liens');
+  conteneur.innerHTML = '';
+
+  if (liste.length === 0) {
+    conteneur.innerHTML = '<p class="vide">Aucun lien pour l’instant.<br>'
+      + 'Ajoutez-les au calme : ils seront là le jour où chercher sera trop dur.</p>';
+    return;
+  }
+
+  liste.forEach((lien) => {
+    const bloc = document.createElement('article');
+    bloc.className = 'lien';
+
+    const nom = document.createElement('p');
+    nom.className = 'nom';
+    nom.textContent = lien.nom;
+    bloc.appendChild(nom);
+
+    const adresse = document.createElement('p');
+    adresse.className = 'adresse';
+    /* On affiche le site plutôt que l'adresse entière : plus court à
+       lire, et cela montre clairement où l'on va atterrir. */
+    try { adresse.textContent = new URL(lien.url).hostname; }
+    catch (e) { adresse.textContent = lien.url; }
+    bloc.appendChild(adresse);
+
+    const rangee = document.createElement('div');
+    rangee.className = 'bouton-rangee';
+
+    /* Ouvrir : deux appuis. Le premier arme, le second ouvre vraiment. */
+    const ouvrir = document.createElement('button');
+    ouvrir.type = 'button';
+    ouvrir.textContent = 'Ouvrir';
+    ouvrir.setAttribute('aria-label', 'Ouvrir ' + lien.nom);
+    let armeOuvrir = null;
+    ouvrir.addEventListener('click', () => {
+      if (!ouvrir.classList.contains('arme')) {
+        ouvrir.classList.add('arme');
+        ouvrir.textContent = 'Confirmer';
+        armeOuvrir = setTimeout(() => {
+          ouvrir.classList.remove('arme');
+          ouvrir.textContent = 'Ouvrir';
+        }, 5000);
+        return;
+      }
+      clearTimeout(armeOuvrir);
+      ouvrir.classList.remove('arme');
+      ouvrir.textContent = 'Ouvrir';
+      /* Nouvel onglet : Refuge reste ouvert derrière, tel quel.
+         rel="noopener" empêche le site ouvert de toucher à Refuge. */
+      const a = document.createElement('a');
+      a.href = lien.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.click();
+    });
+
+    /* Supprimer : deux appuis également, comme dans le journal. */
+    const supprimer = document.createElement('button');
+    supprimer.type = 'button';
+    supprimer.textContent = 'Supprimer';
+    supprimer.setAttribute('aria-label', 'Supprimer ' + lien.nom);
+    let armeSup = false;
+    supprimer.addEventListener('click', async () => {
+      if (!armeSup) {
+        armeSup = true;
+        supprimer.textContent = 'Confirmer';
+        setTimeout(() => { armeSup = false; supprimer.textContent = 'Supprimer'; }, 4000);
+        return;
+      }
+      try {
+        await BDD.liensSupprimer(lien.id);
+        afficherLiens();
+        annoncer('Lien supprimé.');
+      } catch (e) { console.warn('Suppression impossible.', e); }
+    });
+
+    rangee.appendChild(ouvrir);
+    rangee.appendChild(supprimer);
+    bloc.appendChild(rangee);
+    conteneur.appendChild(bloc);
+  });
+}
+
+$('#form-lien').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const erreur = $('#l-erreur');
+  const nom = $('#l-nom').value.trim();
+  const url = urlHttps($('#l-url').value);
+
+  const refuser = (texte) => {
+    erreur.textContent = texte;
+    erreur.classList.remove('masque');
+  };
+
+  if (!nom) { refuser('Donnez un nom à ce lien, pour le reconnaître plus tard.'); return; }
+  if (!url) {
+    refuser("L'adresse doit commencer par https:// — c'est la version "
+      + 'sécurisée du web. Copiez-la depuis votre navigateur, avec le '
+      + 'https:// du début.');
+    return;
+  }
+
+  try {
+    await BDD.liensAjouter({ nom: nom, url: url, ajoute: Date.now() });
+    $('#l-nom').value = '';
+    $('#l-url').value = '';
+    erreur.classList.add('masque');
+    afficherLiens();
+    annoncer('Lien ajouté.');
+  } catch (err) {
+    refuser("Le lien n'a pas pu être enregistré.");
+    console.error(err);
+  }
+});
+
+$$('.entree-liens').forEach((b) => {
+  b.addEventListener('click', (e) => ouvrirEcranLiens(true, e.currentTarget));
+});
+$('#liens-fermer').addEventListener('click', () => ouvrirEcranLiens(false));
+
+/* ============================================================
+   12. DÉMARRAGE
    ============================================================ */
 
 async function demarrer() {
@@ -1140,6 +2008,11 @@ async function demarrer() {
   majBoutonAide();
 
   try { await BDD.ouvrir(); } catch (e) { console.error('Base locale indisponible.', e); }
+
+  /* Le protocole se construit après l'ouverture de la base : l'écran est
+     dessiné à partir de THEMES_PROTOCOLE, puis coché d'après ce qui était
+     enregistré. Si la base est indisponible, l'écran reste utilisable. */
+  initProtocole();
 
   /* Raccourcis de l'écran d'accueil : ?mode=bouclier, ?vue=respiration */
   const params = new URLSearchParams(location.search);
