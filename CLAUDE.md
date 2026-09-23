@@ -79,7 +79,7 @@ Après toute modification d'un fichier **mis en cache** (`index.html`, `app.js`,
 `sw.js` :
 
 ```js
-const CACHE = 'refuge-v8';   // → v9
+const CACHE = 'refuge-v10';   // → v11
 ```
 
 Sans ce changement, le navigateur ne retélécharge rien et **toute personne ayant
