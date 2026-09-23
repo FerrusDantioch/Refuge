@@ -142,9 +142,10 @@
       <p><small>Tout est stocké uniquement sur ce téléphone. Rien n'est envoyé
          sur internet. Vous pouvez exporter une copie pour vous, ou pour la
          montrer à un professionnel.</small></p>
-      <p><small>La sauvegarde JSON contient aussi votre protocole et vos
-         liens : c'est elle qu'il faut garder avant de changer de
-         téléphone.</small></p>
+      <p><small>La sauvegarde JSON contient aussi votre protocole, vos
+         liens et vos réglages : c'est elle qu'il faut garder avant de
+         changer de téléphone. Pour la remettre en place, allez dans
+         Réglages, « Restaurer une sauvegarde ».</small></p>
       <div class="bouton-rangee">
         <button type="button" id="btn-export-csv">Exporter (CSV)</button>
         <button type="button" id="btn-export-json">Sauvegarde (JSON)</button>
@@ -347,6 +348,39 @@
          n'importe quelle application qui demande une position.</small></p>
     </div>
 
+    <!-- Sauvegarde : placée ici, et non dans le Journal, parce qu'elle doit
+         rester accessible même quand le journal est vide — c'est
+         justement le cas après un effacement des données du navigateur. -->
+    <div class="carte">
+      <h2>Sauvegarde de mes données</h2>
+      <p><small>Si les données du navigateur sont effacées (nettoyage du
+         cache, réinstallation, changement de téléphone), tout ce que vous
+         avez saisi dans Refuge disparaît. Un fichier de sauvegarde, rangé
+         dans le téléphone, permet de tout retrouver.</small></p>
+      <p><small>Il contient votre journal, votre protocole, vos liens et vos
+         réglages — y compris le nom et le numéro de votre contact. Gardez-le
+         en lieu sûr : c'est un fichier personnel.</small></p>
+
+      <button type="button" id="btn-sauvegarder" class="bouton-doux" style="margin-bottom:12px">
+        Enregistrer une sauvegarde
+      </button>
+      <p id="derniere-sauvegarde"><small></small></p>
+
+      <button type="button" id="btn-restaurer">Restaurer une sauvegarde</button>
+      <!-- Le vrai sélecteur de fichier est invisible : le bouton ci-dessus,
+           plus grand et plus lisible, l'ouvre à sa place. -->
+      <input type="file" id="fichier-restaurer" accept=".json,application/json" hidden>
+
+      <div id="restaurer-confirmation" class="avis masque" style="margin-top:16px">
+        <p id="restaurer-resume" style="margin-bottom:12px"></p>
+        <div class="bouton-rangee">
+          <button type="button" id="btn-restaurer-annuler">Annuler</button>
+          <button type="button" id="btn-restaurer-confirmer" class="bouton-doux">Restaurer</button>
+        </div>
+      </div>
+      <p id="restaurer-message" class="avis masque" role="status" style="margin-top:16px"></p>
+    </div>
+
     <div class="carte">
       <h2>À propos</h2>
       <p><small>Refuge fonctionne entièrement hors-ligne. Vos réglages et votre
@@ -361,7 +395,7 @@
          calme : savoir à l'avance qui répond et ce qu'on vous demandera enlève
          une inconnue le jour où ça compte.</small></p>
 
-      <p><small>Version 2.0</small></p>
+      <p><small>Version 2.1</small></p>
     </div>
   </section>
 
