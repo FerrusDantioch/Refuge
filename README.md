@@ -16,7 +16,7 @@ sur le téléphone.
 | **Respirer** | Respiration guidée : cohérence 5-5, apaisant 4-7-8, carré 4-4-4-4 |
 | **Protocole** | Ce qui m'aide en crise, à cocher — et la carte image pour l'écran verrouillé |
 | **Journal** | Historique des crises, export CSV et sauvegarde JSON |
-| **Réglages** | Contact, textes, thèmes, taille du texte, position facultative |
+| **Réglages** | Contact, textes, thèmes, taille du texte, position facultative, sauvegarde et restauration de toutes les données |
 
 ### Nouveautés de la version 2
 

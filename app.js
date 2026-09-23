@@ -851,21 +851,10 @@ $('#btn-export-csv').addEventListener('click', async () => {
   telecharger('journal-refuge.csv', csv, 'text/csv;charset=utf-8');
 });
 
-$('#btn-export-json').addEventListener('click', async () => {
-  /* Depuis la v2, la sauvegarde contient aussi le protocole et les liens :
-     c'est le seul fichier à garder avant de changer de téléphone. */
-  let liens = [];
-  try { liens = await BDD.liensTout(); } catch (e) { console.warn('Liens illisibles.', e); }
-
-  const donnees = {
-    version: 2,
-    exporte: new Date().toISOString(),
-    crises: await BDD.tout(),
-    protocole: protocole,
-    liens: liens
-  };
-  telecharger('sauvegarde-refuge.json', JSON.stringify(donnees, null, 2), 'application/json');
-});
+/* La sauvegarde complète (journal, protocole, liens, réglages) est
+   fabriquée par enregistrerSauvegarde(), section 12 : le même fichier
+   que le bouton des Réglages. */
+$('#btn-export-json').addEventListener('click', enregistrerSauvegarde);
 
 
 /* ============================================================
@@ -1998,7 +1987,325 @@ $$('.entree-liens').forEach((b) => {
 $('#liens-fermer').addEventListener('click', () => ouvrirEcranLiens(false));
 
 /* ============================================================
-   12. DÉMARRAGE
+   12. SAUVEGARDE ET RESTAURATION
+   ------------------------------------------------------------
+   Tout ce que vous saisissez vit dans le navigateur (localStorage
+   pour les réglages, IndexedDB pour le reste). Si les « données du
+   site » sont effacées — nettoyage du cache, réinstallation,
+   nouveau téléphone —, tout part avec. Le seul rempart est un
+   fichier rangé dans le téléphone lui-même : on le fabrique ici,
+   et on sait le relire.
+
+   Le fichier ne quitte jamais l'appareil : il est copié de la
+   mémoire de Refuge vers le dossier Téléchargements, sans aucun
+   appel réseau.
+
+   Restaurer n'efface rien de ce qui est déjà là :
+     • les entrées du journal et les liens sont AJOUTÉS, sauf ceux
+       qui existent déjà (restaurer deux fois ne crée pas de doublon) ;
+     • le protocole et les réglages sont remplacés par ceux du
+       fichier, seulement s'il les contient. Les sauvegardes faites
+       avec les versions 1 et 2 n'avaient pas les réglages : on garde
+       alors ceux du téléphone.
+
+   Tout ce qui vient du fichier est vérifié champ par champ avant
+   d'être rangé : un fichier abîmé ou étranger ne doit jamais
+   empêcher Refuge de démarrer ensuite.
+   ============================================================ */
+
+const CLE_DERNIERE_SAUVEGARDE = 'refuge.derniereSauvegarde';
+const CLE_APRES_RESTAURATION = 'refuge.apresRestauration';
+
+const FORMAT_JOUR = new Intl.DateTimeFormat('fr-FR', {
+  day: 'numeric', month: 'long', year: 'numeric'
+});
+
+/* Message visible sous les boutons de la carte « Sauvegarde ». */
+function messageSauvegarde(texte) {
+  const zone = $('#restaurer-message');
+  zone.textContent = texte;
+  zone.classList.toggle('masque', !texte);
+}
+
+function afficherDerniereSauvegarde() {
+  let ts = null;
+  try { ts = Number(localStorage.getItem(CLE_DERNIERE_SAUVEGARDE)) || null; } catch (e) { /* rien */ }
+  $('#derniere-sauvegarde small').textContent = ts
+    ? 'Dernière sauvegarde : le ' + FORMAT_JOUR.format(new Date(ts)) + '.'
+    : "Aucune sauvegarde faite depuis ce téléphone pour l'instant.";
+}
+
+async function enregistrerSauvegarde() {
+  let crises, liens;
+  try {
+    crises = await BDD.tout();
+    liens = await BDD.liensTout();
+  } catch (e) {
+    /* Mieux vaut ne rien fabriquer qu'un fichier incomplet qu'on
+       croirait complet. */
+    console.error(e);
+    messageSauvegarde("La sauvegarde n'a pas pu être faite : la base locale est illisible.");
+    annoncer('Sauvegarde impossible.');
+    return;
+  }
+
+  const donnees = {
+    app: 'refuge',
+    version: 3,
+    exporte: new Date().toISOString(),
+    reglages: reglages,
+    crises: crises,
+    protocole: protocole,
+    liens: liens
+  };
+
+  /* La date dans le nom permet de garder plusieurs sauvegardes côte à
+     côte sans qu'elles s'écrasent. */
+  const nom = 'sauvegarde-refuge-' + maintenantLocal().slice(0, 10) + '.json';
+  telecharger(nom, JSON.stringify(donnees, null, 2), 'application/json');
+
+  try { localStorage.setItem(CLE_DERNIERE_SAUVEGARDE, String(Date.now())); } catch (e) { /* rien */ }
+  afficherDerniereSauvegarde();
+  messageSauvegarde('Fichier « ' + nom + ' » créé dans vos Téléchargements. '
+    + 'Vous pouvez aussi le copier ailleurs (clé USB, ordinateur) pour plus de sûreté.');
+  annoncer('Sauvegarde enregistrée.');
+}
+
+$('#btn-sauvegarder').addEventListener('click', enregistrerSauvegarde);
+
+/* --- Vérification de ce qui vient du fichier --- */
+
+const nombreOuNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const texteOuVide  = (v) => (typeof v === 'string' ? v : '');
+
+function nettoyerCrise(c) {
+  if (!c || typeof c !== 'object') return null;
+  const ts = nombreOuNull(c.ts);
+  if (ts === null) return null;
+  return {
+    ts: ts,
+    duree: nombreOuNull(c.duree),
+    intensite: nombreOuNull(c.intensite),
+    declencheurs: Array.isArray(c.declencheurs)
+      ? c.declencheurs.filter((x) => typeof x === 'string')
+      : [],
+    note: texteOuVide(c.note)
+  };
+}
+
+function nettoyerLien(l) {
+  if (!l || typeof l !== 'object') return null;
+  const nom = texteOuVide(l.nom).trim();
+  const url = urlHttps(l.url);   /* toujours https:// uniquement */
+  if (!nom || !url) return null;
+  return { nom: nom, url: url, ajoute: nombreOuNull(l.ajoute) || Date.now() };
+}
+
+function nettoyerProtocole(p) {
+  const libres = {};
+  if (p.libres && typeof p.libres === 'object') {
+    Object.keys(p.libres).forEach((cle) => {
+      if (typeof p.libres[cle] === 'string') libres[cle] = p.libres[cle];
+    });
+  }
+  return {
+    coches: Array.isArray(p.coches) ? p.coches.filter((x) => typeof x === 'string') : [],
+    libres: libres,
+    contactNom: texteOuVide(p.contactNom),
+    contactTel: texteOuVide(p.contactTel)
+  };
+}
+
+/* Seules les clés connues, avec le bon type, sont reprises. */
+function nettoyerReglages(r) {
+  const propre = {};
+  Object.keys(REGLAGES_DEFAUT).forEach((cle) => {
+    if (typeof r[cle] === typeof REGLAGES_DEFAUT[cle]) propre[cle] = r[cle];
+  });
+  if ('rythme' in propre && !RYTHMES[propre.rythme]) delete propre.rythme;
+  if ('echelle' in propre && !(propre.echelle >= 0.5 && propre.echelle <= 2)) delete propre.echelle;
+  if ('dureeRespi' in propre && !(propre.dureeRespi > 0 && propre.dureeRespi <= 60)) delete propre.dureeRespi;
+  return propre;
+}
+
+/* Renvoie ce qu'il y a à restaurer, ou un texte d'erreur. */
+function lireSauvegarde(d) {
+  const etranger = "Ce fichier ne ressemble pas à une sauvegarde de Refuge.";
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return etranger;
+  if (d.app && d.app !== 'refuge') {
+    return 'Ce fichier est une sauvegarde d’une autre application (« '
+      + String(d.app) + ' ») : il ne peut pas être restauré dans Refuge.';
+  }
+  if (!['crises', 'protocole', 'liens', 'reglages'].some((cle) => cle in d)) return etranger;
+
+  const objet = (v) => v && typeof v === 'object' && !Array.isArray(v);
+  return {
+    exporte: Date.parse(d.exporte) || null,
+    crises: Array.isArray(d.crises) ? d.crises.map(nettoyerCrise).filter(Boolean) : null,
+    liens: Array.isArray(d.liens) ? d.liens.map(nettoyerLien).filter(Boolean) : null,
+    protocole: objet(d.protocole) ? nettoyerProtocole(d.protocole) : null,
+    reglages: objet(d.reglages) ? nettoyerReglages(d.reglages) : null
+  };
+}
+
+/* Deux entrées identiques sur tous ces points sont la même entrée. */
+const signatureCrise = (c) => JSON.stringify([c.ts, c.duree, c.intensite, c.declencheurs, c.note]);
+const signatureLien  = (l) => JSON.stringify([l.nom, l.url]);
+
+function resumeRestauration(r) {
+  const pluriel = (n, un, plusieurs) => n + ' ' + (n > 1 ? plusieurs : un);
+  const contenu = [];
+  if (r.crises && r.crises.length) contenu.push(pluriel(r.crises.length, 'entrée de journal', 'entrées de journal'));
+  if (r.liens && r.liens.length) contenu.push(pluriel(r.liens.length, 'lien apaisant', 'liens apaisants'));
+  if (r.protocole) contenu.push('votre protocole');
+  if (r.reglages && Object.keys(r.reglages).length) contenu.push('vos réglages');
+  if (!contenu.length) return null;
+
+  const liste = contenu.length > 1
+    ? contenu.slice(0, -1).join(', ') + ' et ' + contenu[contenu.length - 1]
+    : contenu[0];
+  const date = r.exporte ? 'Sauvegarde du ' + FORMAT_JOUR.format(new Date(r.exporte)) : 'Cette sauvegarde';
+
+  let texte = date + ' : ' + liste + '. ';
+  if (r.crises || r.liens) texte += 'Ce qui est déjà sur ce téléphone est gardé, sans doublon. ';
+  if (r.protocole || r.reglages) {
+    texte += (r.protocole && r.reglages ? 'Le protocole et les réglages actuels seront remplacés'
+      : r.protocole ? 'Le protocole actuel sera remplacé' : 'Les réglages actuels seront remplacés')
+      + ' par ceux du fichier.';
+  }
+  return texte.trim();
+}
+
+let restaurationEnAttente = null;
+
+function fermerConfirmationRestauration() {
+  restaurationEnAttente = null;
+  $('#restaurer-confirmation').classList.add('masque');
+}
+
+$('#btn-restaurer').addEventListener('click', () => {
+  const champ = $('#fichier-restaurer');
+  champ.value = '';   /* pour pouvoir rechoisir le même fichier */
+  champ.click();
+});
+
+$('#fichier-restaurer').addEventListener('change', async (e) => {
+  const fichier = e.target.files && e.target.files[0];
+  fermerConfirmationRestauration();
+  messageSauvegarde('');
+  if (!fichier) return;
+
+  let donnees;
+  try {
+    if (fichier.size > 20 * 1024 * 1024) throw new Error('Fichier trop gros');
+    donnees = JSON.parse(await fichier.text());
+  } catch (err) {
+    messageSauvegarde("Ce fichier n'a pas pu être lu. Choisissez un fichier "
+      + '« sauvegarde-refuge… .json » créé par Refuge.');
+    return;
+  }
+
+  const lu = lireSauvegarde(donnees);
+  if (typeof lu === 'string') { messageSauvegarde(lu); return; }
+
+  const resume = resumeRestauration(lu);
+  if (!resume) { messageSauvegarde('Ce fichier ne contient rien à restaurer.'); return; }
+
+  /* Rien n'est écrit avant l'appui sur « Restaurer » : on montre
+     d'abord ce que contient le fichier. */
+  restaurationEnAttente = lu;
+  $('#restaurer-resume').textContent = resume;
+  $('#restaurer-confirmation').classList.remove('masque');
+  annoncer(resume);
+});
+
+$('#btn-restaurer-annuler').addEventListener('click', () => {
+  fermerConfirmationRestauration();
+  annoncer('Restauration annulée.');
+});
+
+$('#btn-restaurer-confirmer').addEventListener('click', async () => {
+  const r = restaurationEnAttente;
+  fermerConfirmationRestauration();
+  if (!r) return;
+
+  let ajoutsCrises = 0;
+  let ajoutsLiens = 0;
+  try {
+    if (r.crises) {
+      const deja = new Set((await BDD.tout()).map(signatureCrise));
+      for (const c of r.crises) {
+        const s = signatureCrise(c);
+        if (deja.has(s)) continue;
+        await BDD.ajouter(c);   /* nouveau numéro : on ne reprend jamais l'ancien */
+        deja.add(s);
+        ajoutsCrises++;
+      }
+    }
+    if (r.liens) {
+      const deja = new Set((await BDD.liensTout()).map(signatureLien));
+      for (const l of r.liens) {
+        const s = signatureLien(l);
+        if (deja.has(s)) continue;
+        await BDD.liensAjouter(l);
+        deja.add(s);
+        ajoutsLiens++;
+      }
+    }
+    if (r.protocole) {
+      /* Une écriture différée du protocole en cours ne doit pas venir
+         écraser ce qu'on restaure. */
+      clearTimeout(minuteurProtocole);
+      await BDD.ecrireProtocole({ ...r.protocole, maj: Date.now() });
+    }
+  } catch (err) {
+    console.error(err);
+    messageSauvegarde("La restauration n'a pas pu aller jusqu'au bout. "
+      + 'Vous pouvez réessayer sans crainte : rien ne sera ajouté deux fois.');
+    annoncer('Restauration interrompue.');
+    return;
+  }
+
+  if (r.reglages && Object.keys(r.reglages).length) {
+    reglages = { ...REGLAGES_DEFAUT, ...r.reglages };
+    sauverReglages();
+  }
+
+  let bilan = 'Restauration terminée : '
+    + ajoutsCrises + (ajoutsCrises > 1 ? ' entrées ajoutées' : ' entrée ajoutée') + ' au journal, '
+    + ajoutsLiens + (ajoutsLiens > 1 ? ' liens ajoutés' : ' lien ajouté')
+    + (r.protocole ? ', protocole rétabli' : '')
+    + (r.reglages ? ', réglages rétablis' : '') + '.';
+  if (reglages.aideJointPosition) {
+    bilan += ' Pour joindre votre position au SMS, refaites « Tester ma position » '
+      + 'au calme : l’autorisation d’Android a pu être effacée elle aussi.';
+  }
+
+  /* Le plus sûr pour que chaque écran reflète les données restaurées :
+     recharger Refuge. Le bilan est gardé le temps du rechargement, puis
+     réaffiché dans les Réglages. */
+  try { sessionStorage.setItem(CLE_APRES_RESTAURATION, bilan); } catch (e) { /* rien */ }
+  location.reload();
+});
+
+/* Au démarrage, juste après une restauration : on revient sur les
+   Réglages et on affiche le bilan. */
+function afficherBilanRestauration() {
+  let bilan = null;
+  try {
+    bilan = sessionStorage.getItem(CLE_APRES_RESTAURATION);
+    sessionStorage.removeItem(CLE_APRES_RESTAURATION);
+  } catch (e) { /* rien */ }
+  if (!bilan) return;
+  allerA('reglages');
+  messageSauvegarde(bilan);
+  $('#restaurer-message').scrollIntoView({ block: 'center' });
+  annoncer(bilan);
+}
+
+
+/* ============================================================
+   13. DÉMARRAGE
    ============================================================ */
 
 async function demarrer() {
@@ -2018,6 +2325,9 @@ async function demarrer() {
   const params = new URLSearchParams(location.search);
   if (reglages.bouclierAuDemarrage || params.get('mode') === 'bouclier') activerBouclier(true);
   if (params.get('vue')) allerA(params.get('vue'));
+
+  afficherDerniereSauvegarde();
+  afficherBilanRestauration();
 
   majVerrouEcran();
 
