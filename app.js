@@ -1299,11 +1299,9 @@ const THEMES_PROTOCOLE = [
 ];
 
 /* Ce que Refuge retient de vos choix. « coches » est une liste d'id,
-   « libres » vos propres lignes, thème par thème. */
-let protocole = { coches: [], libres: {}, contactNom: '', contactTel: '' };
-
-/* Le fond choisi pour la carte image (voir section 10). */
-let fondCarte = 'sombre';
+   « libres » vos propres lignes, thème par thème, et « fond » le fond
+   choisi pour la carte image (voir section 10) : 'sombre' ou 'clair'. */
+let protocole = { coches: [], libres: {}, contactNom: '', contactTel: '', fond: 'sombre' };
 
 /* L'écriture dans la base est différée de quelques centièmes de seconde :
    taper dans un champ libre déclencherait sinon une écriture par lettre. */
@@ -1399,6 +1397,9 @@ function afficherProtocole() {
   });
   $('#p-contact-nom').value = protocole.contactNom || '';
   $('#p-contact-tel').value = protocole.contactTel || '';
+  $$('#choix-fond-carte button').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.fond === protocole.fond));
+  });
   majResumeProtocole();
 }
 
@@ -1476,7 +1477,12 @@ function initProtocole() {
       : "Aucun contact n'est enregistré dans les réglages.");
   });
 
-  choixUnique('choix-fond-carte', (b) => { fondCarte = b.dataset.fond; });
+  /* Le fond choisi est retenu avec le reste du protocole : il revient
+     à la prochaine ouverture, et il part dans la sauvegarde. */
+  choixUnique('choix-fond-carte', (b) => {
+    protocole.fond = b.dataset.fond;
+    enregistrerProtocole(true);
+  });
 
   /* Lecture de ce qui était déjà enregistré. En cas d'échec (base
      indisponible), l'écran reste utilisable : il est simplement vide. */
@@ -1487,7 +1493,8 @@ function initProtocole() {
           coches: Array.isArray(enregistre.coches) ? enregistre.coches : [],
           libres: enregistre.libres || {},
           contactNom: enregistre.contactNom || '',
-          contactTel: enregistre.contactTel || ''
+          contactTel: enregistre.contactTel || '',
+          fond: enregistre.fond === 'clair' ? 'clair' : 'sombre'
         };
       }
       afficherProtocole();
@@ -1745,7 +1752,7 @@ function ouvrirEcranCarte(ouvert) {
 }
 
 function fabriquerCarte() {
-  const resultat = dessinerCarte(fondCarte);
+  const resultat = dessinerCarte(protocole.fond);
 
   const apercu = $('#apercu-carte');
   apercu.innerHTML = '';
@@ -2112,7 +2119,8 @@ function nettoyerProtocole(p) {
     coches: Array.isArray(p.coches) ? p.coches.filter((x) => typeof x === 'string') : [],
     libres: libres,
     contactNom: texteOuVide(p.contactNom),
-    contactTel: texteOuVide(p.contactTel)
+    contactTel: texteOuVide(p.contactTel),
+    fond: p.fond === 'clair' ? 'clair' : 'sombre'
   };
 }
 
