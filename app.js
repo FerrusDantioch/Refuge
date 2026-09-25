@@ -1067,8 +1067,8 @@ function majEtatPosition(texte) {
 
 function afficherEtatPosition() {
   if (!position.disponible()) {
-    majEtatPosition('Ce navigateur ne sait pas donner de position : '
-      + 'la fonction est indisponible.');
+    majEtatPosition('Ce téléphone ne permet pas à Refuge de connaître sa '
+      + 'position : la fonction est indisponible.');
     return;
   }
   if (!reglages.aideJointPosition) {
@@ -1079,9 +1079,10 @@ function afficherEtatPosition() {
     if (autorisation === 'granted') {
       majEtatPosition('Autorisation accordée. Tout est prêt.');
     } else if (autorisation === 'denied') {
-      majEtatPosition("Le navigateur refuse la localisation à Refuge : rien ne "
-        + "sera joint. Autorisez-la pour ce site dans les réglages du "
-        + "navigateur, puis touchez « Tester ma position ».");
+      majEtatPosition("La localisation est refusée à Refuge : rien ne sera "
+        + "joint. Autorisez-la dans les réglages du téléphone (application "
+        + "Refuge, ou Chrome / votre navigateur), puis touchez « Tester ma "
+        + "position ».");
     } else {
       majEtatPosition("Autorisation pas encore accordée. Touchez « Tester ma "
         + "position » : c'est le bon moment pour le faire, au calme.");
@@ -1111,9 +1112,9 @@ function testerPosition() {
         $('#r-position').checked = false;
         sauverReglages();
         majEtatPosition("Autorisation refusée : la fonction vient d'être "
-          + "éteinte. Pour la rallumer, autorisez la localisation pour ce "
-          + "site dans les réglages du navigateur, puis retouchez "
-          + "l'interrupteur.");
+          + "éteinte. Pour la rallumer, autorisez la localisation pour "
+          + "Refuge dans les réglages du téléphone (application Refuge, ou "
+          + "Chrome / votre navigateur), puis retouchez l'interrupteur.");
       } else if (err.code === err.POSITION_UNAVAILABLE) {
         majEtatPosition("Position indisponible. Vérifiez que la localisation "
           + "du téléphone est allumée, puis réessayez.");
