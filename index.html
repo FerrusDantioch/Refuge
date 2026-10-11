@@ -48,23 +48,23 @@
 
     <!-- Guides affichés uniquement quand le bouclier est actif -->
     <div id="guides-bouclier" class="carte masque">
-      <h2>Vous êtes en sécurité. Trois gestes.</h2>
+      <h2>Tu es en sécurité. Trois gestes.</h2>
 
       <div class="guide">
         <h3>1. Baisser la lumière</h3>
-        <p>Faites glisser votre doigt du haut de l'écran vers le bas, deux fois.
-           Une barre de luminosité apparaît. Poussez-la vers la gauche, au minimum.</p>
+        <p>Fais glisser ton doigt du haut de l'écran vers le bas, deux fois.
+           Une barre de luminosité apparaît. Pousse-la vers la gauche, au minimum.</p>
       </div>
 
       <div class="guide">
         <h3>2. Faire taire le téléphone</h3>
-        <p>Dans le même panneau, touchez l'icône en forme de croissant de lune,
+        <p>Dans le même panneau, touche l'icône en forme de croissant de lune,
            « Ne pas déranger ». Les notifications s'arrêtent.</p>
       </div>
 
       <div class="guide">
         <h3>3. Respirer</h3>
-        <p>Rien d'autre n'est urgent. Restez ici aussi longtemps qu'il le faut.</p>
+        <p>Rien d'autre n'est urgent. Reste ici aussi longtemps qu'il le faut.</p>
       </div>
 
       <p><small>L'application est désormais totalement silencieuse : aucun son,
@@ -73,7 +73,7 @@
 
     <p id="rappel-reglages" class="avis masque">
       Aucun contact d'urgence n'est encore enregistré.
-      Ouvrez l'onglet <strong>Réglages</strong> pour en ajouter un, à tête reposée.
+      Ouvre l'onglet <strong>Réglages</strong> pour en ajouter un, à tête reposée.
     </p>
 
   </section>
@@ -140,11 +140,11 @@
     <div id="outils-journal" class="carte masque">
       <h3>Mes données</h3>
       <p><small>Tout est stocké uniquement sur ce téléphone. Rien n'est envoyé
-         sur internet. Vous pouvez exporter une copie pour vous, ou pour la
+         sur internet. Tu peux exporter une copie pour toi, ou pour la
          montrer à un professionnel.</small></p>
-      <p><small>La sauvegarde JSON contient aussi votre protocole, vos
-         liens et vos réglages : c'est elle qu'il faut garder avant de
-         changer de téléphone. Pour la remettre en place, allez dans
+      <p><small>La sauvegarde JSON contient aussi ton protocole, tes
+         liens et tes réglages : c'est elle qu'il faut garder avant de
+         changer de téléphone. Pour la remettre en place, va dans
          Réglages, « Restaurer une sauvegarde ».</small></p>
       <div class="bouton-rangee">
         <button type="button" id="btn-export-csv">Exporter (CSV)</button>
@@ -163,7 +163,7 @@
       <div id="cercle" class="cercle" aria-hidden="true"></div>
     </div>
 
-    <p id="consigne" class="consigne">Quand vous voulez</p>
+    <p id="consigne" class="consigne">Quand tu veux</p>
     <p id="compteur" class="compteur">&nbsp;</p>
 
     <button id="btn-respi" class="bouton-doux" style="margin-bottom:20px">Commencer</button>
@@ -191,8 +191,8 @@
 
     <button type="button" class="entree-liens" style="margin-bottom:16px">Ce qui m'apaise</button>
 
-    <p><small>Si suivre le cercle demande trop d'effort, fermez les yeux et
-       suivez seulement les mots. Si c'est encore trop, posez le téléphone :
+    <p><small>Si suivre le cercle demande trop d'effort, ferme les yeux et
+       suis seulement les mots. Si c'est encore trop, pose le téléphone :
        ne rien faire est aussi une réponse valable.</small></p>
   </section>
 
@@ -205,16 +205,16 @@
   <section id="vue-protocole" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-protocole" hidden>
     <h1>Mon protocole</h1>
 
-    <p><small>Cochez ce qui vous aide pendant une crise. Ce sont vos mots, pas
+    <p><small>Coche ce qui t'aide pendant une crise. Ce sont tes mots, pas
        des consignes médicales : ils servent à renseigner les personnes autour
-       de vous quand parler devient impossible. Tout reste sur ce téléphone,
+       de toi quand parler devient impossible. Tout reste sur ce téléphone,
        et chaque case est enregistrée toute seule.</small></p>
 
     <div id="protocole-themes"></div>
 
     <div class="carte">
       <h2>Qui prévenir</h2>
-      <p><small>Facultatif. Ce nom et ce numéro apparaîtront en bas de votre
+      <p><small>Facultatif. Ce nom et ce numéro apparaîtront en bas de ta
          carte, sous les lignes cochées.</small></p>
 
       <label for="p-contact-nom">Son nom</label>
@@ -231,7 +231,7 @@
     <div class="carte">
       <h2>Ma carte pour l'écran verrouillé</h2>
       <p><small>Refuge fabrique une image à partir des lignes cochées. Posée en
-         fond d'écran verrouillé, elle parle à votre place, même téléphone
+         fond d'écran verrouillé, elle parle à ta place, même téléphone
          fermé, même batterie presque vide.</small></p>
 
       <p class="avis">Ce texte sera visible par tout le monde, même téléphone
@@ -275,11 +275,11 @@
       <label for="r-carte">Message affiché en grand, pour les gens autour de moi</label>
       <textarea id="r-carte"></textarea>
 
-      <p><small>Dans ces deux textes, écrivez <strong>[Contact]</strong> et
+      <p><small>Dans ces deux textes, écris <strong>[Contact]</strong> et
          <strong>[Numéro]</strong> : ils seront remplacés automatiquement par le nom
          et le numéro saisis ci-dessus.</small></p>
       <p><small>Dans le SMS seulement, <strong>[Position]</strong> indique où
-         placer le lien vers votre position, si vous activez cette option plus
+         placer le lien vers ta position, si tu actives cette option plus
          bas. Sans ce mot, le lien est ajouté à la fin du message ; si l'option
          est éteinte, il ne se passe rien.</small></p>
       <button type="button" id="btn-defaut-message">Remettre les textes d'origine</button>
@@ -315,10 +315,6 @@
         <span>Proposer d'envoyer le SMS à mon contact</span>
         <input type="checkbox" id="r-ouvrir-sms" checked>
       </label>
-      <label class="interrupteur" for="r-afficher-carte">
-        <span>Afficher aussi le message en grand</span>
-        <input type="checkbox" id="r-afficher-carte" checked>
-      </label>
       <label class="interrupteur" for="r-bouclier-auto">
         <span>Activer aussi le bouclier sensoriel</span>
         <input type="checkbox" id="r-bouclier-auto">
@@ -335,15 +331,15 @@
 
       <p><small>Un lien <strong>OpenStreetMap</strong> est ajouté au SMS — sans
          compte ni traceur — avec la précision réelle du point et l'heure du
-         relevé, pour que votre contact sache à quel point s'y fier.</small></p>
-      <p><small>Faites ce test <strong>maintenant, au calme</strong> : c'est lui
+         relevé, pour que ton contact sache à quel point s'y fier.</small></p>
+      <p><small>Fais ce test <strong>maintenant, au calme</strong> : c'est lui
          qui demande l'autorisation à Android. Refuge ne la demandera jamais
          pendant une crise — si elle n'est pas déjà accordée, le SMS partira
          simplement sans position, sans aucune fenêtre à gérer.</small></p>
       <p><small>Avant l'envoi, la carte affiche ce qui sera joint, avec un
-         bouton pour retirer votre position cette fois-ci. L'application
+         bouton pour retirer ta position cette fois-ci. L'application
          n'envoie rien elle-même : les coordonnées arrivent dans
-         l'application Messages, et c'est vous qui appuyez sur Envoyer. Pour
+         l'application Messages, et c'est toi qui appuies sur Envoyer. Pour
          situer le téléphone, Android peut interroger le réseau, comme pour
          n'importe quelle application qui demande une position.</small></p>
     </div>
@@ -355,12 +351,12 @@
       <h2>Sauvegarde de mes données</h2>
       <p><small>Si les données de Refuge sont effacées (nettoyage des
          données de Chrome ou du navigateur, réinstallation, changement de
-         téléphone), tout ce que vous avez saisi disparaît. Un fichier de
+         téléphone), tout ce que tu as saisi disparaît. Un fichier de
          sauvegarde, rangé dans le téléphone, permet de tout retrouver.</small></p>
-      <p><small>Il contient votre journal, vos liens, vos réglages et tout
-         votre protocole : les cases cochées, vos propres lignes, la personne
+      <p><small>Il contient ton journal, tes liens, tes réglages et tout
+         ton protocole : les cases cochées, tes propres lignes, la personne
          à prévenir et le fond choisi pour la carte. Il contient donc aussi
-         des noms et des numéros de téléphone : gardez-le en lieu sûr, c'est
+         des noms et des numéros de téléphone : garde-le en lieu sûr, c'est
          un fichier personnel.</small></p>
 
       <button type="button" id="btn-sauvegarder" class="bouton-doux" style="margin-bottom:12px">
@@ -385,7 +381,7 @@
 
     <div class="carte">
       <h2>À propos</h2>
-      <p><small>Refuge fonctionne entièrement hors-ligne. Vos réglages et votre
+      <p><small>Refuge fonctionne entièrement hors-ligne. Tes réglages et ton
          journal restent sur ce téléphone ; ils ne sont jamais envoyés ailleurs.
          Cette application n'est pas un dispositif médical et ne remplace ni un
          professionnel, ni les secours (15, 112).</small></p>
@@ -393,8 +389,8 @@
       <button type="button" id="btn-urgences-reglages" style="margin-bottom:16px">
         Numéros d'urgence
       </button>
-      <p><small>La même liste que depuis l'écran d'accueil. Lisez-la une fois au
-         calme : savoir à l'avance qui répond et ce qu'on vous demandera enlève
+      <p><small>La même liste que depuis l'écran d'accueil. Lis-la une fois au
+         calme : savoir à l'avance qui répond et ce qu'on te demandera enlève
          une inconnue le jour où ça compte.</small></p>
 
       <p><small>Version 2.1</small></p>
@@ -462,23 +458,23 @@
 
   <h2 id="urgences-titre">Numéros d'urgence</h2>
   <p class="intro">En France, tous ces numéros sont gratuits et répondent
-     24 h/24. Ils sont là pour que vous sachiez déjà ce qui existe, et ce qui
-     se passe si vous appelez un jour. Vous n'avez rien à en faire aujourd'hui.</p>
+     24 h/24. Ils sont là pour que tu saches déjà ce qui existe, et ce qui
+     se passe si tu appelles un jour. Tu n'as rien à en faire aujourd'hui.</p>
 
   <div class="urgence">
     <p class="tete"><span class="numero">114</span> Urgences par SMS ou visio</p>
     <p>Le numéro d'urgence des personnes qui ne peuvent pas parler : sourdes,
-       malentendantes, aphasiques, ou sans voix sur le moment. Vous écrivez,
-       on vous répond par écrit. Le 114 prévient ensuite le SAMU, les pompiers
-       ou la police à votre place.</p>
+       malentendantes, aphasiques, ou sans voix sur le moment. Tu écris,
+       on te répond par écrit. Le 114 prévient ensuite le SAMU, les pompiers
+       ou la police à ta place.</p>
     <button type="button" data-sms="114">Écrire au 114</button>
   </div>
 
   <div class="urgence">
     <p class="tete"><span class="numero">15</span> SAMU — urgence médicale</p>
-    <p>Un médecin régulateur répond. On vous demandera d'abord <strong>où vous
-       êtes</strong>, puis ce qui se passe. Si vous ne pouvez pas parler,
-       passez par le 114.</p>
+    <p>Un médecin régulateur répond. On te demandera d'abord <strong>où tu
+       es</strong>, puis ce qui se passe. Si tu ne peux pas parler,
+       passe par le 114.</p>
     <button type="button" data-appel="15">Appeler le 15</button>
   </div>
 
@@ -505,7 +501,7 @@
 
   <div class="urgence">
     <p class="tete"><span class="numero">3114</span> Prévention du suicide</p>
-    <p>Pour les pensées suicidaires, les vôtres ou celles de quelqu'un d'autre.
+    <p>Pour les pensées suicidaires, les tiennes ou celles de quelqu'un d'autre.
        Un professionnel écoute, sans jugement, aussi longtemps qu'il le faut.
        On peut appeler seulement pour parler à quelqu'un.</p>
     <button type="button" data-appel="3114">Appeler le 3114</button>
@@ -536,11 +532,11 @@
 
     <p id="carte-avis-numero" class="masque"><small>Un numéro de téléphone posé
        sur un écran verrouillé est lisible par n'importe qui — y compris par
-       quelqu'un qui n'a rien à y faire. Si cela vous gêne, retirez-le dans
+       quelqu'un qui n'a rien à y faire. Si cela te gêne, retire-le dans
        « Qui prévenir » : la carte reste utile sans lui.</small></p>
 
     <p><small>Rien n'est envoyé nulle part : l'image est fabriquée par ce
-       téléphone, et reste dessus tant que vous ne la partagez pas.</small></p>
+       téléphone, et reste dessus tant que tu ne la partages pas.</small></p>
 
     <div class="bouton-rangee">
       <button type="button" id="carte-annuler">Annuler</button>
@@ -549,7 +545,7 @@
   </div>
 
   <div id="carte-etape-apercu" class="masque">
-    <p><small>Voici votre carte. Regardez-la en entier avant de la poser en
+    <p><small>Voici ta carte. Regarde-la en entier avant de la poser en
        fond d'écran.</small></p>
 
     <div id="apercu-carte"></div>
@@ -565,14 +561,14 @@
 
     <h3>La mettre en écran verrouillé (Redmi / Xiaomi)</h3>
     <ol class="etapes">
-      <li>Touchez « Télécharger l'image » : elle arrive dans l'application
+      <li>Touche « Télécharger l'image » : elle arrive dans l'application
           <strong>Galerie</strong>, album « Téléchargements ».</li>
-      <li>Ouvrez la Galerie, puis l'image.</li>
-      <li>Touchez <strong>⋮</strong> (ou « Plus ») en bas à droite, puis
+      <li>Ouvre la Galerie, puis l'image.</li>
+      <li>Touche <strong>⋮</strong> (ou « Plus ») en bas à droite, puis
           <strong>Définir comme fond d'écran</strong>.</li>
-      <li>Choisissez <strong>Écran de verrouillage</strong> — pas l'écran
+      <li>Choisis <strong>Écran de verrouillage</strong> — pas l'écran
           d'accueil.</li>
-      <li>Ne recadrez pas : reculez l'image jusqu'à voir tout le texte, puis
+      <li>Ne recadre pas : recule l'image jusqu'à voir tout le texte, puis
           <strong>Appliquer</strong>.</li>
     </ol>
     <p><small>Si le fond d'écran change tout seul au bout de quelques heures,
@@ -594,9 +590,9 @@
      role="dialog" aria-modal="true" aria-labelledby="liens-titre">
 
   <h2 id="liens-titre">Ce qui m'apaise</h2>
-  <p class="intro">Vos playlists, livres audio, podcasts, vidéos. Refuge garde
+  <p class="intro">Tes playlists, livres audio, podcasts, vidéos. Refuge garde
      seulement leur nom et leur adresse, sur ce téléphone. Il n'ouvre rien tout
-     seul et ne lit rien : c'est vous qui décidez, à chaque fois.</p>
+     seul et ne lit rien : c'est toi qui décides, à chaque fois.</p>
 
   <form id="form-lien" novalidate>
     <label for="l-nom">Nom du lien</label>

@@ -42,7 +42,6 @@ const REGLAGES_DEFAUT = {
   ecranAllume: false,
   echelle: 1,
   aideOuvreSms: true,
-  aideAfficheCarte: true,
   aideActiveBouclier: false,
   aideJointPosition: false,   /* éteint par défaut : voir section POSITION */
   rythme: 'coherence',
@@ -409,7 +408,7 @@ function afficherCarteSos(avecActions) {
   const avert = $('#sos-avertissement');
   if (avecActions && !tel) {
     avert.textContent = "Aucun contact d'urgence n'est enregistré. "
-      + "Ouvrez l'onglet Réglages pour en ajouter un.";
+      + "Ouvre l'onglet Réglages pour en ajouter un.";
     avert.classList.remove('masque');
   } else {
     avert.classList.add('masque');
@@ -628,7 +627,7 @@ const BDD = {
          peut bloquer la mise à jour. On le dit clairement plutôt que
          d'attendre sans fin. */
       demande.onblocked = () => {
-        console.warn('Mise à jour de la base bloquée : fermez les autres onglets de Refuge.');
+        console.warn('Mise à jour de la base bloquée : ferme les autres onglets de Refuge.');
       };
 
       demande.onsuccess = () => { BDD.base = demande.result; resoudre(BDD.base); };
@@ -764,7 +763,7 @@ async function afficherCrises() {
   if (liste.length === 0) {
     conteneur.innerHTML =
       '<p class="vide">Aucune entrée pour l\'instant.<br>' +
-      'Rien ne presse : notez seulement quand vous en avez l\'énergie.</p>';
+      'Rien ne presse : note seulement quand tu en as l\'énergie.</p>';
     return;
   }
 
@@ -877,8 +876,8 @@ const RYTHMES = {
     description: "Inspirer 5 secondes, expirer 5 secondes. Le rythme de la cohérence " +
                  "cardiaque : c'est celui qui apaise le plus vite le système nerveux.",
     phases: [
-      { texte: 'Inspirez',   duree: 5, vers: 1    },
-      { texte: 'Expirez',    duree: 5, vers: 0.45 }
+      { texte: 'Inspire',    duree: 5, vers: 1    },
+      { texte: 'Expire',     duree: 5, vers: 0.45 }
     ]
   },
   apaisant: {
@@ -886,9 +885,9 @@ const RYTHMES = {
     description: "Inspirer 4 secondes, retenir 7, expirer 8. L'expiration longue " +
                  "envoie au corps un signal de sécurité. Idéal pour redescendre.",
     phases: [
-      { texte: 'Inspirez',   duree: 4, vers: 1    },
-      { texte: 'Retenez',    duree: 7, vers: 1    },
-      { texte: 'Expirez',    duree: 8, vers: 0.45 }
+      { texte: 'Inspire',    duree: 4, vers: 1    },
+      { texte: 'Retiens',    duree: 7, vers: 1    },
+      { texte: 'Expire',     duree: 8, vers: 0.45 }
     ]
   },
   carre: {
@@ -896,9 +895,9 @@ const RYTHMES = {
     description: "Quatre temps égaux de 4 secondes. Très prévisible : rien ne " +
                  "surprend, ce qui aide quand l'imprévu est justement le problème.",
     phases: [
-      { texte: 'Inspirez',   duree: 4, vers: 1    },
-      { texte: 'Retenez',    duree: 4, vers: 1    },
-      { texte: 'Expirez',    duree: 4, vers: 0.45 },
+      { texte: 'Inspire',    duree: 4, vers: 1    },
+      { texte: 'Retiens',    duree: 4, vers: 1    },
+      { texte: 'Expire',     duree: 4, vers: 0.45 },
       { texte: 'Pause',      duree: 4, vers: 0.45 }
     ]
   }
@@ -1001,7 +1000,7 @@ const respiration = {
       this.echelleActuelle = 0.45;
     }
     $('#btn-respi').textContent = 'Commencer';
-    $('#consigne').textContent = 'Quand vous voulez';
+    $('#consigne').textContent = 'Quand tu veux';
     $('#compteur').innerHTML = '&nbsp;';
   }
 };
@@ -1096,7 +1095,7 @@ function afficherEtatPosition() {
     return;
   }
   if (!reglages.aideJointPosition) {
-    majEtatPosition('Éteint : aucune position ne sera jointe à vos SMS.');
+    majEtatPosition('Éteint : aucune position ne sera jointe à tes SMS.');
     return;
   }
   position.etatAutorisation().then((autorisation) => {
@@ -1104,11 +1103,11 @@ function afficherEtatPosition() {
       majEtatPosition('Autorisation accordée. Tout est prêt.');
     } else if (autorisation === 'denied') {
       majEtatPosition("La localisation est refusée à Refuge : rien ne sera "
-        + "joint. Autorisez-la dans les réglages du téléphone : Applications "
+        + "joint. Autorise-la dans les réglages du téléphone : Applications "
         + "› Refuge › Autorisations › Position (dans Chrome : réglages du "
-        + "site). Puis touchez « Tester ma position ».");
+        + "site). Puis touche « Tester ma position ».");
     } else {
-      majEtatPosition("Autorisation pas encore accordée. Touchez « Tester ma "
+      majEtatPosition("Autorisation pas encore accordée. Touche « Tester ma "
         + "position » : c'est le bon moment pour le faire, au calme.");
     }
   });
@@ -1136,16 +1135,16 @@ function testerPosition() {
         $('#r-position').checked = false;
         sauverReglages();
         majEtatPosition("Autorisation refusée : la fonction vient d'être "
-          + "éteinte. Pour la rallumer, autorisez la localisation dans les "
+          + "éteinte. Pour la rallumer, autorise la localisation dans les "
           + "réglages du téléphone : Applications › Refuge › Autorisations › "
-          + "Position (dans Chrome : réglages du site), puis retouchez "
+          + "Position (dans Chrome : réglages du site), puis retouche "
           + "l'interrupteur.");
       } else if (err.code === err.POSITION_UNAVAILABLE) {
-        majEtatPosition("Position indisponible. Vérifiez que la localisation "
-          + "du téléphone est allumée, puis réessayez.");
+        majEtatPosition("Position indisponible. Vérifie que la localisation "
+          + "du téléphone est allumée, puis réessaie.");
       } else {
         majEtatPosition("Trop long pour trouver un point. À l'intérieur d'un "
-          + "bâtiment c'est fréquent : réessayez près d'une fenêtre, ou dehors.");
+          + "bâtiment c'est fréquent : réessaie près d'une fenêtre, ou dehors.");
       }
       annoncer('Position introuvable.');
     },
@@ -1170,7 +1169,6 @@ function initReglages() {
   lierCase('#r-bouclier-demarrage', 'bouclierAuDemarrage');
   lierCase('#r-ecran-allume', 'ecranAllume', majVerrouEcran);
   lierCase('#r-ouvrir-sms', 'aideOuvreSms');
-  lierCase('#r-afficher-carte', 'aideAfficheCarte');
   lierCase('#r-bouclier-auto', 'aideActiveBouclier');
 
   /* Allumer l'interrupteur déclenche aussitôt le test : c'est ainsi que
@@ -1469,7 +1467,7 @@ function majResumeProtocole() {
   bouton.style.opacity = total === 0 ? '0.5' : '';
 
   if (total === 0) {
-    resume.textContent = "Cochez au moins une ligne pour pouvoir créer votre carte.";
+    resume.textContent = "Coche au moins une ligne pour pouvoir créer ta carte.";
   } else {
     resume.textContent = total + (total > 1 ? ' lignes iront' : ' ligne ira')
       + ' sur la carte. Huit à douze lignes se lisent d’un coup d’œil ; '
@@ -1791,7 +1789,7 @@ function fabriquerCarte() {
   if (resultat.oubliees > 0) {
     alerte.textContent = resultat.oubliees
       + (resultat.oubliees > 1 ? ' lignes n’ont pas pu tenir' : ' ligne n’a pas pu tenir')
-      + ' sur la carte : elles ne sont pas sur l’image. Décochez-en '
+      + ' sur la carte : elles ne sont pas sur l’image. Décoches-en '
       + 'quelques-unes pour que tout rentre en grand.';
     alerte.classList.remove('masque');
   } else {
@@ -1819,7 +1817,7 @@ function fabriquerCarte() {
     $('#carte-partager').classList.toggle('masque', !partageable);
   }, 'image/png');
 
-  annoncer('Carte créée. Vous pouvez la télécharger.');
+  annoncer('Carte créée. Tu peux la télécharger.');
 }
 
 $('#btn-creer-carte').addEventListener('click', () => ouvrirEcranCarte(true));
@@ -1902,7 +1900,7 @@ async function afficherLiens() {
 
   if (liste.length === 0) {
     conteneur.innerHTML = '<p class="vide">Aucun lien pour l’instant.<br>'
-      + 'Ajoutez-les au calme : ils seront là le jour où chercher sera trop dur.</p>';
+      + 'Ajoute-les au calme : ils seront là le jour où chercher sera trop dur.</p>';
     return;
   }
 
@@ -1993,10 +1991,10 @@ $('#form-lien').addEventListener('submit', async (e) => {
     erreur.classList.remove('masque');
   };
 
-  if (!nom) { refuser('Donnez un nom à ce lien, pour le reconnaître plus tard.'); return; }
+  if (!nom) { refuser('Donne un nom à ce lien, pour le reconnaître plus tard.'); return; }
   if (!url) {
     refuser("L'adresse doit commencer par https:// — c'est la version "
-      + 'sécurisée du web. Copiez-la depuis votre navigateur, avec le '
+      + 'sécurisée du web. Copie-la depuis ton navigateur, avec le '
       + 'https:// du début.');
     return;
   }
@@ -2099,8 +2097,8 @@ async function enregistrerSauvegarde() {
 
   try { localStorage.setItem(CLE_DERNIERE_SAUVEGARDE, String(Date.now())); } catch (e) { /* rien */ }
   afficherDerniereSauvegarde();
-  messageSauvegarde('Fichier « ' + nom + ' » créé dans vos Téléchargements. '
-    + 'Vous pouvez aussi le copier ailleurs (clé USB, ordinateur) pour plus de sûreté.');
+  messageSauvegarde('Fichier « ' + nom + ' » créé dans tes Téléchargements. '
+    + 'Tu peux aussi le copier ailleurs (clé USB, ordinateur) pour plus de sûreté.');
   annoncer('Sauvegarde enregistrée.');
 }
 
@@ -2192,8 +2190,8 @@ function resumeRestauration(r) {
   const contenu = [];
   if (r.crises && r.crises.length) contenu.push(pluriel(r.crises.length, 'entrée de journal', 'entrées de journal'));
   if (r.liens && r.liens.length) contenu.push(pluriel(r.liens.length, 'lien apaisant', 'liens apaisants'));
-  if (r.protocole) contenu.push('votre protocole');
-  if (r.reglages && Object.keys(r.reglages).length) contenu.push('vos réglages');
+  if (r.protocole) contenu.push('ton protocole');
+  if (r.reglages && Object.keys(r.reglages).length) contenu.push('tes réglages');
   if (!contenu.length) return null;
 
   const liste = contenu.length > 1
@@ -2235,7 +2233,7 @@ $('#fichier-restaurer').addEventListener('change', async (e) => {
     if (fichier.size > 20 * 1024 * 1024) throw new Error('Fichier trop gros');
     donnees = JSON.parse(await fichier.text());
   } catch (err) {
-    messageSauvegarde("Ce fichier n'a pas pu être lu. Choisissez un fichier "
+    messageSauvegarde("Ce fichier n'a pas pu être lu. Choisis un fichier "
       + '« sauvegarde-refuge… .json » créé par Refuge.');
     return;
   }
@@ -2296,7 +2294,7 @@ $('#btn-restaurer-confirmer').addEventListener('click', async () => {
   } catch (err) {
     console.error(err);
     messageSauvegarde("La restauration n'a pas pu aller jusqu'au bout. "
-      + 'Vous pouvez réessayer sans crainte : rien ne sera ajouté deux fois.');
+      + 'Tu peux réessayer sans crainte : rien ne sera ajouté deux fois.');
     annoncer('Restauration interrompue.');
     return;
   }
@@ -2312,7 +2310,7 @@ $('#btn-restaurer-confirmer').addEventListener('click', async () => {
     + (r.protocole ? ', protocole rétabli' : '')
     + (r.reglages ? ', réglages rétablis' : '') + '.';
   if (reglages.aideJointPosition) {
-    bilan += ' Pour joindre votre position au SMS, refaites « Tester ma position » '
+    bilan += ' Pour joindre ta position au SMS, refais « Tester ma position » '
       + 'au calme : l’autorisation d’Android a pu être effacée elle aussi.';
   }
 
