@@ -47,6 +47,12 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   ajoutée doit garder cette forme. Les `id` de `THEMES_PROTOCOLE` sont la clé
   de stockage : **ne jamais en modifier un déjà publié**, sinon la case se
   décoche chez les gens.
+- **Tutoiement : l'application tutoie la personne.** Tout texte qui s'adresse
+  à elle (boutons, explications, consignes de respiration, annonces pour
+  lecteur d'écran, messages d'erreur) dit « tu ». Exception voulue : ce
+  qu'elle montre aux autres (propositions du protocole, carte pour l'écran
+  verrouillé, message affiché en grand) parle à des inconnus et garde le
+  « vous » — « Je vous entends même sans répondre ».
 - **Carte pour l'écran verrouillé : avertissement obligatoire avant
   fabrication.** Un écran verrouillé se lit sans déverrouiller le téléphone,
   donc par n'importe qui, y compris quelqu'un de mal intentionné. L'image
@@ -79,7 +85,7 @@ Après toute modification d'un fichier **mis en cache** (`index.html`, `app.js`,
 `sw.js` :
 
 ```js
-const CACHE = 'refuge-v10';   // → v11
+const CACHE = 'refuge-v13';   // → v14
 ```
 
 Sans ce changement, le navigateur ne retélécharge rien et **toute personne ayant
