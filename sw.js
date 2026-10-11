@@ -3,7 +3,7 @@
    En crise, on ne peut pas dépendre du réseau : tout est mis en cache
    la première fois, puis servi depuis le téléphone. */
 
-const CACHE = 'refuge-v12';
+const CACHE = 'refuge-v13';
 
 /* La liste des fichiers indispensables au fonctionnement hors-ligne. */
 const FICHIERS = [
@@ -17,11 +17,14 @@ const FICHIERS = [
   './maskable-512.png'
 ];
 
-/* 1. Installation : on télécharge et on range tout dans le cache. */
+/* 1. Installation : on télécharge et on range tout dans le cache.
+      cache: 'reload' va chercher les fichiers sur le serveur, jamais dans
+      la mémoire temporaire du navigateur : GitHub Pages la garde dix
+      minutes, et la nouvelle version aurait pu ranger d'anciens fichiers. */
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll(FICHIERS))
+      .then((c) => c.addAll(FICHIERS.map((f) => new Request(f, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
@@ -36,11 +39,14 @@ self.addEventListener('activate', (e) => {
 });
 
 /* 3. Interception des requêtes : on sert d'abord le cache (instantané, hors-ligne),
-      et on rafraîchit discrètement en arrière-plan si le réseau répond. */
+      et on rafraîchit discrètement en arrière-plan si le réseau répond.
+      ignoreSearch : les raccourcis de l'icône ouvrent « index.html?mode=bouclier »
+      ou « ?vue=respiration ». Sans cette option, ces adresses ne correspondaient
+      à rien dans le cache, et le raccourci « Bouclier » échouait hors-ligne. */
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then((enCache) => {
+    caches.match(e.request, { ignoreSearch: true }).then((enCache) => {
       const surLeReseau = fetch(e.request)
         .then((rep) => {
           if (rep && rep.status === 200 && rep.type === 'basic') {
