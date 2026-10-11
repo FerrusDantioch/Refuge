@@ -203,6 +203,7 @@ const position = {
   point: null,       /* { lat, lon, precision, ts } */
   veille: null,      /* identifiant rendu par watchPosition */
   retiree: false,    /* la personne a retiré sa position pour cette fois-ci */
+  session: 0,        /* change à chaque ouverture et fermeture de la carte */
 
   disponible() { return 'geolocation' in navigator; },
 
@@ -218,11 +219,17 @@ const position = {
 
   demarrer() {
     if (!reglages.aideJointPosition || !this.disponible()) return;
-    this.retiree = false;
+    /* On repart toujours de zéro, et chaque réponse du GPS porte le numéro
+       de session qui l'a demandée. Un point qui arrive après la fermeture
+       de la carte est ainsi ignoré : sans cela, il restait en mémoire et
+       partait avec le SMS de la crise suivante, peut-être ailleurs. */
+    this.oublier();
+    const session = this.session;
     this.etat = 'recherche';
     majLignePosition();
 
     this.etatAutorisation().then((autorisation) => {
+      if (session !== this.session) return;   /* carte refermée entre-temps */
       if (autorisation === 'prompt') {
         /* Jamais accordée : on ne la demande pas maintenant. Règle 1. */
         this.etat = 'nonAutorisee';
@@ -233,8 +240,9 @@ const position = {
       /* Premier appel : on accepte volontiers un point que le téléphone a
          déjà en mémoire (maximumAge), donc souvent immédiat. */
       navigator.geolocation.getCurrentPosition(
-        (p) => this.retenir(p),
+        (p) => this.retenir(p, session),
         (err) => {
+          if (session !== this.session) return;
           if (this.etat === 'trouvee') return;   /* la veille a déjà réussi */
           this.etat = (err && err.code === err.PERMISSION_DENIED)
             ? 'nonAutorisee' : 'echec';
@@ -247,7 +255,7 @@ const position = {
          premier point est souvent grossier de plusieurs centaines de mètres. */
       try {
         this.veille = navigator.geolocation.watchPosition(
-          (p) => this.retenir(p),
+          (p) => this.retenir(p, session),
           () => { /* un échec de la veille ne change rien : on garde le point */ },
           { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
@@ -257,7 +265,8 @@ const position = {
     });
   },
 
-  retenir(p) {
+  retenir(p, session) {
+    if (session !== this.session) return;   /* réponse d'une carte déjà fermée */
     const nouveau = {
       lat: p.coords.latitude,
       lon: p.coords.longitude,
@@ -283,6 +292,7 @@ const position = {
   /* Remise à zéro complète, à la fermeture de la carte. Un point gardé
      d'une crise à l'autre enverrait un jour le contact au mauvais endroit. */
   oublier() {
+    this.session++;   /* les réponses encore en route seront ignorées */
     this.arreterVeille();
     this.point = null;
     this.etat = 'inactif';
@@ -894,6 +904,13 @@ const RYTHMES = {
   }
 };
 
+/* Réglage système « réduire les animations ». La règle de styles.css ne
+   suffit pas ici : elle ne touche que les animations écrites en CSS, pas
+   celles lancées par animate(). Le cercle reste alors immobile : les mots
+   et le compte à rebours guident seuls. Lu à chaque phase, pour suivre un
+   changement de réglage fait pendant la séance. */
+const MOUVEMENT_REDUIT = window.matchMedia('(prefers-reduced-motion: reduce)');
+
 const respiration = {
   enCours: false,
   indexPhase: 0,
@@ -930,12 +947,17 @@ const respiration = {
        Aucun rebond, aucune accélération brusque. */
     const cercle = $('#cercle');
     if (this.animation) this.animation.cancel();
-    this.animation = cercle.animate(
-      [{ transform: 'scale(' + this.echelleActuelle + ')' },
-       { transform: 'scale(' + phase.vers + ')' }],
-      { duration: phase.duree * 1000, easing: 'ease-in-out', fill: 'forwards' }
-    );
-    this.echelleActuelle = phase.vers;
+    if (MOUVEMENT_REDUIT.matches) {
+      this.animation = null;
+      this.echelleActuelle = 0.45;   /* la taille de repos, celle du CSS */
+    } else {
+      this.animation = cercle.animate(
+        [{ transform: 'scale(' + this.echelleActuelle + ')' },
+         { transform: 'scale(' + phase.vers + ')' }],
+        { duration: phase.duree * 1000, easing: 'ease-in-out', fill: 'forwards' }
+      );
+      this.echelleActuelle = phase.vers;
+    }
 
     this.minuteur = setTimeout(() => {
       if (!this.enCours) return;
@@ -970,10 +992,12 @@ const respiration = {
     if (this.animation) {
       /* Retour doux à la taille de repos, jamais un saut brutal. */
       this.animation.cancel();
-      $('#cercle').animate(
-        [{ transform: 'scale(' + this.echelleActuelle + ')' }, { transform: 'scale(0.45)' }],
-        { duration: 1200, easing: 'ease-in-out', fill: 'forwards' }
-      );
+      if (!MOUVEMENT_REDUIT.matches) {
+        $('#cercle').animate(
+          [{ transform: 'scale(' + this.echelleActuelle + ')' }, { transform: 'scale(0.45)' }],
+          { duration: 1200, easing: 'ease-in-out', fill: 'forwards' }
+        );
+      }
       this.echelleActuelle = 0.45;
     }
     $('#btn-respi').textContent = 'Commencer';
@@ -2134,7 +2158,8 @@ function nettoyerReglages(r) {
   });
   if ('rythme' in propre && !RYTHMES[propre.rythme]) delete propre.rythme;
   if ('echelle' in propre && !(propre.echelle >= 0.5 && propre.echelle <= 2)) delete propre.echelle;
-  if ('dureeRespi' in propre && !(propre.dureeRespi > 0 && propre.dureeRespi <= 60)) delete propre.dureeRespi;
+  /* 0 veut dire « Sans fin » : c'est une valeur valable. */
+  if ('dureeRespi' in propre && !(propre.dureeRespi >= 0 && propre.dureeRespi <= 60)) delete propre.dureeRespi;
   return propre;
 }
 
