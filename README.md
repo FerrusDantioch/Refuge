@@ -4,7 +4,7 @@ Application web (PWA) d'aide aux crises de surcharge sensorielle.
 Fonctionne hors-ligne, sans compte, sans traceur. Toutes les données restent
 sur le téléphone.
 
-**Version 2.**
+**Version 2.2.**
 
 ---
 
@@ -12,11 +12,39 @@ sur le téléphone.
 
 | Écran | À quoi il sert |
 |---|---|
-| **Accueil** | Le gros bouton d'aide (SMS pré-rempli), le bouclier sensoriel, le message à montrer, les numéros d'urgence |
+| **Accueil** | Le gros bouton d'aide (SMS pré-rempli), le bouclier sensoriel, le message à montrer (avec des phrases courtes), « Quand ça monte », les numéros d'urgence |
 | **Respirer** | Respiration guidée : cohérence 5-5, apaisant 4-7-8, carré 4-4-4-4 |
-| **Protocole** | Ce qui m'aide en crise, à cocher — et la carte image pour l'écran verrouillé |
-| **Journal** | Historique des crises, export CSV et sauvegarde JSON |
-| **Réglages** | Contact, textes, thèmes, taille du texte, position facultative, sauvegarde et restauration de toutes les données |
+| **Protocole** | Ce qui m'aide en crise, à cocher — la carte image pour l'écran verrouillé — et, pour soi, « Quand je sens que ça monte » |
+| **Journal** | Historique des crises, note en un appui, ce qui revient le plus souvent, export CSV et sauvegarde JSON |
+| **Réglages** | Contact, textes, phrases courtes, thème et gammes de couleurs, taille du texte, déclencheurs personnels, position facultative, sauvegarde et restauration de toutes les données |
+
+### Nouveautés de la version 2.2
+
+**1. Des phrases courtes à montrer.** Sous « Montrer un message », une série
+de boutons : « Oui », « Non », « Attendez, s'il vous plaît », « J'ai besoin de
+sortir »… Une phrase touchée s'affiche en grand, pour répondre sans parler.
+Elles se changent dans les Réglages (une par ligne) et ne déclenchent jamais
+rien d'autre. Elles n'apparaissent pas sur la carte « J'ai besoin d'aide ».
+
+**2. Noter une crise en un appui.** « Noter une crise maintenant » enregistre
+seulement l'heure. L'entrée se complète plus tard, quand l'énergie revient —
+ou jamais. Toute entrée du journal peut désormais être modifiée.
+
+**3. Ce qui revient le plus souvent.** En haut du journal, une phrase calculée
+sur le téléphone : le nombre de crises des trois derniers mois et les
+déclencheurs les plus fréquents.
+
+**4. Des déclencheurs personnels.** « Vêtement qui gratte », « Téléphone qui
+sonne »… Ils s'ajoutent en notant une crise, et se gèrent dans les Réglages.
+
+**5. Quand je sens que ça monte.** Dans l'onglet Protocole, une partie pour
+soi (elle ne va jamais sur la carte) : ses premiers signes, et ce qui aide
+tant qu'il est encore temps. On la relit depuis l'accueil, avec le bouton
+« Quand ça monte ». Comme les liens apaisants, il disparaît en bouclier.
+
+**6. Les gammes de couleurs de Cap.** Bleu-gris, sauge, lavande, sable,
+pêche, miel, rose poudré, en plus de la gamme d'origine. Le bouclier
+sensoriel, lui, reste toujours noir.
 
 ### Nouveautés de la version 2
 
@@ -140,7 +168,7 @@ republie.
 | Fichier | Rôle |
 |---|---|
 | `index.html` | Les 5 écrans et **tous les textes affichés** |
-| `styles.css` | Couleurs, tailles, les 3 thèmes (tout est en haut du fichier) |
+| `styles.css` | Couleurs, tailles, les thèmes et les gammes de couleurs (tout est en haut du fichier) |
 | `app.js` | Le comportement : boutons, protocole, carte image, liens, journal, respiration |
 | `sw.js` | Le mode hors-ligne |
 | `manifest.json` | Nom et icône de l'application |
