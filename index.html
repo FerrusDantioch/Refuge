@@ -10,6 +10,25 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
+<!-- Pose le thème, la gamme de couleurs, la taille du texte et le bouclier
+     AVANT le premier affichage : sans cela, l'écran s'allume une fraction
+     de seconde avec les couleurs par défaut. En bouclier, ce serait un
+     éclair de lumière au pire moment. app.js refait ensuite la même chose. -->
+<script>
+(function () {
+  try {
+    var r = JSON.parse(localStorage.getItem('refuge.reglages')) || {};
+    var racine = document.documentElement;
+    racine.dataset.theme = r.themeClair ? 'clair' : 'sombre';
+    if (typeof r.palette === 'string') racine.dataset.palette = r.palette;
+    var echelle = Number(r.echelle);
+    if (echelle >= 0.5 && echelle <= 2) racine.style.setProperty('--echelle', echelle);
+    if (r.bouclierAuDemarrage || new URLSearchParams(location.search).get('mode') === 'bouclier') {
+      racine.dataset.bouclier = 'on';
+    }
+  } catch (e) { /* réglages illisibles : on garde le thème par défaut */ }
+})();
+</script>
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -39,6 +58,11 @@
     </div>
 
     <button id="btn-respirer-vite" style="margin-bottom:16px">Respirer avec moi</button>
+
+    <!-- Ce que la personne a préparé au calme pour le moment où ça monte.
+         N'apparaît que si elle l'a rempli (onglet Protocole), et disparaît
+         en bouclier, comme les liens apaisants. -->
+    <button id="btn-monte" class="masque" style="margin-bottom:16px">Quand ça monte</button>
 
     <button id="btn-urgences" style="margin-bottom:16px">Numéros d'urgence</button>
 
@@ -84,13 +108,27 @@
   <section id="vue-journal" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-journal" hidden>
     <h1>Journal</h1>
 
-    <button id="btn-nouvelle" class="bouton-doux" style="margin-bottom:18px">
-      Enregistrer une crise
+    <button id="btn-noter-vite" class="bouton-doux" style="margin-bottom:8px">
+      Noter une crise maintenant
     </button>
+    <p><small>Un seul appui : seule l'heure est enregistrée. Tu pourras
+       compléter plus tard, quand tu en auras l'énergie.</small></p>
+
+    <button id="btn-nouvelle" style="margin-bottom:18px">
+      Enregistrer une crise en détail
+    </button>
+
+    <p id="journal-message" class="avis masque" role="status"></p>
+
+    <!-- Ce qui revient le plus souvent, calculé sur ce téléphone. -->
+    <div id="bilan-journal" class="carte masque">
+      <h3>Ces trois derniers mois</h3>
+      <p id="bilan-texte" style="margin-bottom:0"></p>
+    </div>
 
     <!-- Formulaire d'ajout, masqué par défaut -->
     <form id="form-crise" class="carte masque" novalidate>
-      <h2>Nouvelle entrée</h2>
+      <h2 id="titre-form-crise">Nouvelle entrée</h2>
 
       <label for="f-date">Date et heure</label>
       <input type="datetime-local" id="f-date" required>
@@ -114,16 +152,14 @@
       </div>
 
       <label>Déclencheurs</label>
-      <div class="choix" id="f-declencheurs" role="group" aria-label="Déclencheurs possibles">
-        <button type="button" data-val="Bruit">Bruit</button>
-        <button type="button" data-val="Lumière">Lumière</button>
-        <button type="button" data-val="Foule">Foule</button>
-        <button type="button" data-val="Odeur">Odeur</button>
-        <button type="button" data-val="Contact physique">Contact</button>
-        <button type="button" data-val="Imprévu">Imprévu</button>
-        <button type="button" data-val="Fatigue">Fatigue</button>
-        <button type="button" data-val="Interaction sociale">Social</button>
-        <button type="button" data-val="Transport">Transport</button>
+      <!-- Les boutons sont construits par app.js : la liste de base
+           (DECLENCHEURS), puis les déclencheurs personnels. -->
+      <div class="choix" id="f-declencheurs" role="group" aria-label="Déclencheurs possibles"></div>
+
+      <label for="f-autre-declencheur">Un autre déclencheur, à garder pour la suite</label>
+      <div class="ajout-ligne">
+        <input type="text" id="f-autre-declencheur" maxlength="40" placeholder="Par exemple : Vêtement qui gratte">
+        <button type="button" id="btn-ajouter-declencheur">Ajouter</button>
       </div>
 
       <label for="f-note">Autre chose à noter (facultatif)</label>
@@ -248,6 +284,17 @@
       <button type="button" id="btn-creer-carte" class="bouton-doux">Créer ma carte</button>
       <p id="p-resume"><small></small></p>
     </div>
+
+    <!-- Pour soi, pas pour les autres : rien de cette partie ne va sur la
+         carte. Construit par app.js à partir de THEMES_MONTEE. -->
+    <div class="carte">
+      <h2>Quand je sens que ça monte</h2>
+      <p><small>Cette partie est pour toi : elle n'apparaît pas sur la carte.
+         Note tes premiers signes, et ce qui t'aide tant qu'il est encore
+         temps. Tu les retrouveras sur l'accueil, avec le bouton « Quand ça
+         monte ».</small></p>
+      <div id="monte-themes"></div>
+    </div>
   </section>
 
   <!-- ========================================================
@@ -286,9 +333,20 @@
     </div>
 
     <div class="carte">
+      <h2>Phrases courtes à montrer</h2>
+      <label for="r-phrases">Une phrase par ligne</label>
+      <textarea id="r-phrases"></textarea>
+      <p><small>Quand tu touches « Montrer un message », ces phrases
+         apparaissent sous ton message. Touche-en une : elle s'affiche en
+         grand, pour répondre à quelqu'un sans parler. Elles s'adressent aux
+         autres : garde le « vous ».</small></p>
+      <button type="button" id="btn-defaut-phrases">Remettre les phrases d'origine</button>
+    </div>
+
+    <div class="carte">
       <h2>Confort visuel</h2>
       <label class="interrupteur" for="r-theme-clair">
-        <span>Thème clair (beige)</span>
+        <span>Thème clair</span>
         <input type="checkbox" id="r-theme-clair">
       </label>
       <label class="interrupteur" for="r-bouclier-demarrage">
@@ -299,6 +357,44 @@
         <span>Garder l'écran allumé dans l'application</span>
         <input type="checkbox" id="r-ecran-allume">
       </label>
+
+      <h3 style="margin-top:18px">Couleurs</h3>
+      <div class="palette-grille" id="choix-palette" role="group" aria-label="Gamme de couleurs">
+        <button type="button" class="palette-carte" data-palette="refuge">
+          <span class="pastille" style="background:#7ea8a0"></span>
+          Refuge
+        </button>
+        <button type="button" class="palette-carte" data-palette="bleu">
+          <span class="pastille" style="background:#9dbcd0"></span>
+          Bleu-gris
+        </button>
+        <button type="button" class="palette-carte" data-palette="sauge">
+          <span class="pastille" style="background:#a5ccb4"></span>
+          Sauge
+        </button>
+        <button type="button" class="palette-carte" data-palette="lavande">
+          <span class="pastille" style="background:#c0b6e6"></span>
+          Lavande
+        </button>
+        <button type="button" class="palette-carte" data-palette="sable">
+          <span class="pastille" style="background:#b89a7a"></span>
+          Sable
+        </button>
+        <button type="button" class="palette-carte" data-palette="peche">
+          <span class="pastille" style="background:#ddb8a3"></span>
+          Pêche
+        </button>
+        <button type="button" class="palette-carte" data-palette="miel">
+          <span class="pastille" style="background:#d6c19f"></span>
+          Miel
+        </button>
+        <button type="button" class="palette-carte" data-palette="rose">
+          <span class="pastille" style="background:#daabb5"></span>
+          Rose poudré
+        </button>
+      </div>
+      <p><small>Les mêmes gammes douces que dans Cap. Le bouclier sensoriel,
+         lui, reste toujours noir.</small></p>
 
       <h3 style="margin-top:18px">Taille du texte</h3>
       <div class="choix" id="choix-taille" role="group" aria-label="Taille du texte">
@@ -342,6 +438,15 @@
          l'application Messages, et c'est toi qui appuies sur Envoyer. Pour
          situer le téléphone, Android peut interroger le réseau, comme pour
          n'importe quelle application qui demande une position.</small></p>
+    </div>
+
+    <div class="carte">
+      <h2>Mes déclencheurs</h2>
+      <label for="r-declencheurs">Mes déclencheurs personnels, un par ligne</label>
+      <textarea id="r-declencheurs" class="champ-libre" placeholder="Par exemple : Téléphone qui sonne"></textarea>
+      <p><small>Ils s'ajoutent à la liste du journal, après Bruit, Lumière,
+         Foule… Tu peux aussi en ajouter un directement en notant une crise.
+         Effacer une ligne ici ne change rien aux entrées déjà notées.</small></p>
     </div>
 
     <!-- Sauvegarde : placée ici, et non dans le Journal, parce qu'elle doit
@@ -393,7 +498,7 @@
          calme : savoir à l'avance qui répond et ce qu'on te demandera enlève
          une inconnue le jour où ça compte.</small></p>
 
-      <p><small>Version 2.1</small></p>
+      <p><small>Version 2.2</small></p>
     </div>
   </section>
 
@@ -431,6 +536,10 @@
 <!-- ====== Carte de communication plein écran ====== -->
 <div id="carte-sos" class="carte-sos" hidden role="dialog" aria-modal="true" aria-label="Message à montrer">
   <p class="message" id="sos-message"></p>
+  <!-- Phrases courtes, seulement pour « Montrer un message » : une phrase
+       touchée s'affiche en grand à la place du message. Elles ne déclenchent
+       jamais rien d'autre. -->
+  <div id="sos-phrases" class="phrases masque" role="group" aria-label="Phrases courtes à montrer"></div>
   <p class="avis masque" id="sos-avertissement"></p>
   <div class="pied">
     <!-- Ligne de transparence : ce qui part avec le SMS, et comment le retirer.
@@ -614,6 +723,34 @@
 
   <div class="pied">
     <button type="button" id="liens-fermer">Fermer</button>
+  </div>
+</div>
+
+<!-- ====== Quand ça monte ======
+     Ce que la personne a noté au calme, relu au moment où elle sent la
+     crise arriver. Volontairement absent en bouclier : à ce stade-là, le
+     bouclier, c'est le silence. -->
+<div id="ecran-monte" class="carte-sos defile lisible-en-bouclier" hidden tabindex="-1"
+     role="dialog" aria-modal="true" aria-labelledby="monte-titre">
+
+  <h2 id="monte-titre">Quand ça monte</h2>
+  <p class="intro">Tu l'as écrit au calme, pour ce moment-ci. Rien n'est
+     obligatoire : prends ce qui t'aide.</p>
+
+  <div id="monte-actions-bloc">
+    <h3>Ce que je peux faire</h3>
+    <ul class="liste-monte" id="monte-actions"></ul>
+  </div>
+
+  <div id="monte-signes-bloc">
+    <h3>Mes premiers signes</h3>
+    <ul class="liste-monte" id="monte-signes"></ul>
+  </div>
+
+  <div class="pied">
+    <button type="button" id="monte-respirer" class="bouton-doux masque" style="margin-bottom:12px">Respirer avec moi</button>
+    <button type="button" id="monte-bouclier" class="masque" style="margin-bottom:12px">Allumer le bouclier sensoriel</button>
+    <button type="button" id="monte-fermer">Fermer</button>
   </div>
 </div>
 

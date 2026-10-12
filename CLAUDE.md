@@ -4,9 +4,9 @@ PWA d'aide aux personnes autistes pendant une crise de surcharge sensorielle, en
 **HTML/CSS/JS pur, sans dépendance ni compilation**. L'utilisateur cible s'en
 sert au moment où la parole et la motricité fine deviennent difficiles.
 
-Cinq écrans : Accueil, Respirer, Protocole, Journal, Réglages — plus trois
-écrans plein écran (message à montrer, numéros d'urgence, liens apaisants) et
-l'écran de fabrication de la carte.
+Cinq écrans : Accueil, Respirer, Protocole, Journal, Réglages — plus quatre
+écrans plein écran (message à montrer, numéros d'urgence, liens apaisants,
+« Quand ça monte ») et l'écran de fabrication de la carte.
 
 ## ⚠️ Contraintes de conception : à préserver, pas à rediscuter
 
@@ -18,9 +18,18 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   construction : `app.js` n'appelle jamais `navigator.vibrate`, ne crée jamais
   d'objet `Audio` et ne demande jamais l'autorisation d'envoyer des
   notifications. Ne pas introduire ces appels, même « discrets ».
-- **Aucun blanc pur ni noir pur** dans les deux thèmes normaux. Seul le mode
+- **Aucun blanc pur ni noir pur** dans les thèmes normaux. Seul le mode
   « bouclier sensoriel » passe au `#000`, et uniquement parce que les pixels
   OLED éteints réduisent la lumière émise.
+- **Gammes de couleurs : le bouclier passe toujours avant.** Les huit gammes
+  (`refuge`, celle d'origine, et les sept de Cap) sont posées par
+  `data-palette` sur `<html>`. Les variables du bouclier sont en
+  `!important` pour qu'aucune gamme, même ajoutée plus tard, ne l'éclaire :
+  ne jamais retirer ces `!important`. Le bouton d'aide garde sa teinte
+  terracotta dans toutes les gammes. Le script du `<head>` d'`index.html`
+  pose thème, gamme, taille et bouclier avant le premier affichage (pas
+  d'éclair de lumière au démarrage en bouclier) ; `app.js` refait la même
+  chose ensuite.
 - **Aucun compte, aucun appel réseau, aucun traceur, aucune publicité.** Tout
   reste en `localStorage` / `IndexedDB` : rien ne quitte l'appareil.
 - **Animations lentes et régulières**, jamais brusques ; `prefers-reduced-motion`
@@ -47,6 +56,20 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   ajoutée doit garder cette forme. Les `id` de `THEMES_PROTOCOLE` sont la clé
   de stockage : **ne jamais en modifier un déjà publié**, sinon la case se
   décoche chez les gens.
+- **« Quand je sens que ça monte » : pour soi, jamais sur la carte.** Cette
+  partie du Protocole (`THEMES_MONTEE`, rangée dans `protocole.monte`) ne
+  doit jamais entrer dans `lignesProtocole()` ni sur l'image. Mêmes règles
+  que le protocole : première personne, de l'information et pas une
+  consigne, et des `id` qui ne changent jamais. Son bouton d'accueil et son
+  écran disparaissent en bouclier, comme les liens apaisants. Une
+  sauvegarde plus ancienne (sans `monte`) ne l'efface pas à la restauration.
+- **Phrases courtes à montrer : seulement pour « Montrer un message ».**
+  Elles s'affichent en grand et ne déclenchent jamais rien (ni SMS, ni
+  appel). Absentes de la carte « J'ai besoin d'aide ». Elles parlent aux
+  autres : elles gardent le « vous ».
+- **Journal : modifier une entrée = `put()` dans le tiroir `crises`.**
+  Aucun nouveau tiroir, donc aucune montée de version d'IndexedDB. Une
+  entrée « rapide » n'a que son heure ; elle se complète plus tard.
 - **Tutoiement : l'application tutoie la personne.** Tout texte qui s'adresse
   à elle (boutons, explications, consignes de respiration, annonces pour
   lecteur d'écran, messages d'erreur) dit « tu ». Exception voulue : ce
@@ -85,7 +108,7 @@ Après toute modification d'un fichier **mis en cache** (`index.html`, `app.js`,
 `sw.js` :
 
 ```js
-const CACHE = 'refuge-v13';   // → v14
+const CACHE = 'refuge-v14';   // → v15
 ```
 
 Sans ce changement, le navigateur ne retélécharge rien et **toute personne ayant

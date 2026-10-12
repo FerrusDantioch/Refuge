@@ -6,6 +6,8 @@
    - zones tactiles très larges (min 64px) : la motricité fine
      se dégrade pendant une crise
    - trois thèmes : Doux sombre (défaut), Doux clair, Bouclier
+   - huit gammes de couleurs : celle d'origine (« refuge ») et les
+     sept de Cap, toutes désaturées, en sombre et en clair
    ============================================================ */
 
 /* ---------- 1. Thèmes (variables de couleur) ---------- */
@@ -49,22 +51,90 @@ html[data-theme="clair"] {
   color-scheme: light;      /* thème beige : habillage clair du navigateur */
 }
 
+/* ---------- Gammes de couleurs (les mêmes que dans Cap) ----------
+   Choisies dans Réglages, posées par app.js via data-palette="<gamme>"
+   sur <html>. Sans data-palette, ou avec « refuge », ce sont les
+   couleurs d'origine ci-dessus. Le bouton d'aide garde partout sa teinte
+   terracotta (variables --aide-…) : on le reconnaît quelle que soit la
+   gamme. Toute nouvelle gamme doit rester aussi douce que celles-ci. */
+
+html[data-palette="bleu"][data-theme="sombre"] {
+  --bg: #161b21; --surface: #1d242d; --surface-2: #252e39; --bord: #344050;
+  --texte: #d4dae0; --texte-doux: #97a2ae; --accent: #9dbcd0; --accent-fond: #233240;
+}
+html[data-palette="bleu"][data-theme="clair"] {
+  --bg: #eef0f2; --surface: #f7f8f9; --surface-2: #e9ebee; --bord: #d7dbe0;
+  --texte: #3b4046; --texte-doux: #6e757d; --accent: #4f7086; --accent-fond: #e3eaee;
+}
+html[data-palette="sauge"][data-theme="sombre"] {
+  --bg: #161c19; --surface: #1d2621; --surface-2: #25302a; --bord: #354539;
+  --texte: #d4dcd6; --texte-doux: #98aa9e; --accent: #a5ccb4; --accent-fond: #243529;
+}
+html[data-palette="sauge"][data-theme="clair"] {
+  --bg: #eef1ec; --surface: #f6f8f4; --surface-2: #e7ebe3; --bord: #d3dbcd;
+  --texte: #384038; --texte-doux: #69756a; --accent: #5d8579; --accent-fond: #e2ebe6;
+}
+html[data-palette="lavande"][data-theme="sombre"] {
+  --bg: #1a1822; --surface: #221f2d; --surface-2: #2b2839; --bord: #3d3850;
+  --texte: #dcd8e3; --texte-doux: #a59fb3; --accent: #c0b6e6; --accent-fond: #2f2945;
+}
+html[data-palette="lavande"][data-theme="clair"] {
+  --bg: #f1eef5; --surface: #f8f6fa; --surface-2: #eae6f0; --bord: #d8d2e2;
+  --texte: #423d4c; --texte-doux: #756e82; --accent: #7871a8; --accent-fond: #e8e4f0;
+}
+html[data-palette="sable"][data-theme="sombre"] {
+  --bg: #1c1815; --surface: #241f1a; --surface-2: #2e2721; --bord: #453a30;
+  --texte: #ded6cc; --texte-doux: #a89c8e; --accent: #b89a7a; --accent-fond: #332b22;
+}
+html[data-palette="sable"][data-theme="clair"] {
+  --bg: #f3ece2; --surface: #faf6f0; --surface-2: #ede4d6; --bord: #ddd0bd;
+  --texte: #453a30; --texte-doux: #7d7062; --accent: #8c6a46; --accent-fond: #f0e6d8;
+}
+html[data-palette="peche"][data-theme="sombre"] {
+  --bg: #1d1816; --surface: #27201d; --surface-2: #312824; --bord: #4a3b34;
+  --texte: #e6dbd4; --texte-doux: #b09f95; --accent: #ddb8a3; --accent-fond: #3d2b22;
+}
+html[data-palette="peche"][data-theme="clair"] {
+  --bg: #f7eee8; --surface: #fcf7f3; --surface-2: #f1e5dc; --bord: #e3d1c4;
+  --texte: #4a3a32; --texte-doux: #806c61; --accent: #a47260; --accent-fond: #f5e2d7;
+}
+html[data-palette="miel"][data-theme="sombre"] {
+  --bg: #1c1a15; --surface: #26231c; --surface-2: #302c23; --bord: #484133;
+  --texte: #e3ddd0; --texte-doux: #aca48f; --accent: #d6c19f; --accent-fond: #3a3324;
+}
+html[data-palette="miel"][data-theme="clair"] {
+  --bg: #f6f1e4; --surface: #fbf8ef; --surface-2: #efe8d6; --bord: #ded3b9;
+  --texte: #463f2e; --texte-doux: #7d735c; --accent: #8a7748; --accent-fond: #f1e9d2;
+}
+html[data-palette="rose"][data-theme="sombre"] {
+  --bg: #1d1719; --surface: #271f22; --surface-2: #31272b; --bord: #4a3a40;
+  --texte: #e5d9dd; --texte-doux: #ae9ca3; --accent: #daabb5; --accent-fond: #3d2a30;
+}
+html[data-palette="rose"][data-theme="clair"] {
+  --bg: #f6eef0; --surface: #fbf6f7; --surface-2: #efe3e6; --bord: #e0cdd2;
+  --texte: #4a3940; --texte-doux: #806b73; --accent: #a4677a; --accent-fond: #f3e2e7;
+}
+
 /* Thème BOUCLIER : noir absolu #000 (pixels OLED éteints = batterie
-   économisée et zero lumiere émise), texte gris très doux. */
+   économisée et zero lumiere émise), texte gris très doux.
+   Les « !important » sont voulus : le bouclier doit passer AVANT
+   n'importe quelle gamme de couleurs, même une gamme ajoutée plus tard
+   dans ce fichier. Sans eux, choisir « Lavande » laisserait un bouclier
+   violet au lieu d'un écran noir. */
 html[data-bouclier="on"] {
-  --bg:          #000000;
-  --surface:     #000000;
-  --surface-2:   #070707;
-  --bord:        #232323;
-  --texte:       #6f6f6f;
-  --texte-doux:  #4d4d4d;
-  --accent:      #3f4b48;
-  --accent-fond: #000000;
-  --aide-fond:   #000000;
-  --aide-bord:   #4a413d;
-  --aide-texte:  #8a7f79;
-  --duree: 0ms;             /* plus aucune transition en crise */
-  color-scheme: dark;       /* même en thème clair, le bouclier reste noir */
+  --bg:          #000000 !important;
+  --surface:     #000000 !important;
+  --surface-2:   #070707 !important;
+  --bord:        #232323 !important;
+  --texte:       #6f6f6f !important;
+  --texte-doux:  #4d4d4d !important;
+  --accent:      #3f4b48 !important;
+  --accent-fond: #000000 !important;
+  --aide-fond:   #000000 !important;
+  --aide-bord:   #4a413d !important;
+  --aide-texte:  #8a7f79 !important;
+  --duree: 0ms !important;  /* plus aucune transition en crise */
+  color-scheme: dark !important;  /* même en thème clair, le bouclier reste noir */
 }
 
 /* En bouclier, le Journal reste lisible : contraste doux mais suffisant. */
@@ -526,6 +596,70 @@ html[data-bouclier="on"] .interrupteur input { filter: brightness(0.55); }
 /* Un bouton armé attend le second appui, comme pour les urgences. */
 .lien button.arme { background: var(--accent-fond); border-color: var(--accent); }
 html[data-bouclier="on"] .lien button.arme { background: #101010; border-color: #5a5a5a; }
+
+/* ============================================================
+   13 bis. NOUVEAUTÉS DE LA VERSION 2.2
+   ============================================================ */
+
+/* Réglages : choix de la gamme, comme dans Cap. */
+.palette-grille {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.palette-carte {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 96px;
+  padding: 16px 10px;
+}
+.palette-carte .pastille {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--bord);
+  display: block;
+}
+.palette-carte[aria-pressed="true"] {
+  background: var(--accent-fond);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Carte « Montrer un message » avec les phrases courtes : la liste peut
+   dépasser l'écran, elle part donc du haut (centrée, le haut serait
+   coupé et impossible à atteindre). */
+.carte-sos.avec-phrases { justify-content: flex-start; }
+.phrases {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.phrases button { min-height: 64px; padding: 12px; overflow-wrap: anywhere; }
+.phrases .retour-message { grid-column: 1 / -1; }
+.phrases button[aria-pressed="true"] {
+  background: var(--accent-fond);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+html[data-bouclier="on"] .phrases button[aria-pressed="true"] { background: #101010; }
+/* Une phrase courte s'affiche encore plus grand que le message. */
+.carte-sos .message.phrase { font-size: 2.3rem; line-height: 1.3; overflow-wrap: anywhere; }
+
+/* Journal : champ + bouton côte à côte, et boutons d'une entrée. */
+.ajout-ligne { display: flex; gap: 10px; align-items: stretch; margin-bottom: 18px; }
+.ajout-ligne input { margin-bottom: 0; flex: 1; min-width: 0; }
+.ajout-ligne button { width: auto; flex-shrink: 0; }
+.actions-entree { display: flex; flex-wrap: wrap; gap: 10px; }
+.choix button { overflow-wrap: anywhere; }
+
+/* Écran « Quand ça monte » : des listes simples, bien espacées. */
+.liste-monte { margin: 0 0 22px; padding-left: 22px; }
+.liste-monte li { margin-bottom: 10px; font-size: 1.05rem; line-height: 1.5; }
 
 /* ============================================================
    14. BARRE D'ONGLETS À CINQ ENTRÉES (v2)
