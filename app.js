@@ -32,6 +32,22 @@ const MESSAGE_CARTE_DEFAUT =
   "Je fais une crise d'autisme, je ne peux pas parler.\n\n" +
   "Merci de me laisser de l'espace, ou d'appeler [Contact] au [Numéro].";
 
+/* Les phrases courtes de « Montrer un message ». Elles s'adressent aux
+   gens autour : elles gardent le « vous », comme le message affiché. */
+const PHRASES_DEFAUT = [
+  'Oui',
+  'Non',
+  "Attendez, s'il vous plaît",
+  "J'ai besoin de sortir",
+  'Il y a trop de bruit',
+  "Je vais bien, laissez-moi du temps",
+  'Merci'
+].join('\n');
+
+/* Les gammes de couleurs proposées dans Réglages : « refuge » est la gamme
+   d'origine, les autres sont celles de Cap (voir styles.css). */
+const PALETTES = ['refuge', 'bleu', 'sauge', 'lavande', 'sable', 'peche', 'miel', 'rose'];
+
 const REGLAGES_DEFAUT = {
   nom: '',
   tel: '',
@@ -45,7 +61,10 @@ const REGLAGES_DEFAUT = {
   aideActiveBouclier: false,
   aideJointPosition: false,   /* éteint par défaut : voir section POSITION */
   rythme: 'coherence',
-  dureeRespi: 3
+  dureeRespi: 3,
+  palette: 'refuge',
+  phrases: PHRASES_DEFAUT,
+  declencheursPerso: ''      /* un par ligne, comme les phrases */
 };
 
 let reglages = { ...REGLAGES_DEFAUT };
@@ -89,6 +108,7 @@ function remplir(texte) {
 
 function appliquerTheme() {
   racine.dataset.theme = reglages.themeClair ? 'clair' : 'sombre';
+  racine.dataset.palette = PALETTES.includes(reglages.palette) ? reglages.palette : 'refuge';
   racine.style.setProperty('--echelle', reglages.echelle);
   majCouleurBarre();
 }
@@ -115,15 +135,21 @@ function activerBouclier(actif) {
   $$('.entree-liens').forEach((b) => b.classList.toggle('masque', actif));
   if (actif && !$('#ecran-liens').hidden) ouvrirEcranLiens(false);
 
+  /* Même règle pour « Quand ça monte » : c'est un outil d'avant la crise. */
+  majEntreeMonte();
+  if (actif && !$('#ecran-monte').hidden) ouvrirEcranMonte(false);
+
   majCouleurBarre();
   annoncer(actif
     ? 'Bouclier sensoriel activé. Écran noir, application silencieuse.'
     : 'Bouclier sensoriel désactivé.');
 }
 
-/* La barre système d'Android prend la couleur du fond de l'application. */
+/* La barre système d'Android prend la couleur du fond de l'application,
+   lue directement dans le CSS : elle suit le thème, la gamme et le
+   bouclier sans liste de couleurs à tenir à jour ici. */
 function majCouleurBarre() {
-  const c = bouclierActif ? '#000000' : (reglages.themeClair ? '#f1eee8' : '#171b21');
+  const c = getComputedStyle(racine).getPropertyValue('--bg').trim() || '#171b21';
   const balise = document.querySelector('meta[name="theme-color"]');
   if (balise) balise.setAttribute('content', c);
 }
@@ -389,6 +415,11 @@ function majLignePosition() {
      déclencher un appel par mégarde. */
 function afficherCarteSos(avecActions) {
   $('#sos-message').textContent = remplir(reglages.messageCarte);
+  $('#sos-message').classList.remove('phrase');
+
+  /* Les phrases courtes ne servent qu'à « Montrer un message » : sur la
+     carte d'appel à l'aide, elles ajouteraient des choix au pire moment. */
+  construirePhrases(avecActions ? [] : phrasesAMontrer());
 
   const tel = numeroPropre(reglages.tel);
   const nom = reglages.nom || 'mon contact';
@@ -442,6 +473,56 @@ $('#btn-aide').addEventListener('click', () => {
 
 $('#btn-carte').addEventListener('click', () => afficherCarteSos(false));
 
+/* --- Phrases courtes à montrer ---
+   Une réponse rapide quand la parole s'en va : « Oui », « Non »,
+   « Attendez »… La personne touche une phrase, elle s'affiche en grand à
+   la place du message, et elle tend le téléphone. Rien d'autre ne se
+   passe : aucune phrase n'envoie ni n'appelle quoi que ce soit. */
+function phrasesAMontrer() {
+  return (reglages.phrases || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function construirePhrases(liste) {
+  const zone = $('#sos-phrases');
+  zone.innerHTML = '';
+  zone.classList.toggle('masque', liste.length === 0);
+  $('#carte-sos').classList.toggle('avec-phrases', liste.length > 0);
+  if (!liste.length) return;
+
+  /* Le premier bouton ramène au message principal. */
+  const retour = document.createElement('button');
+  retour.type = 'button';
+  retour.className = 'retour-message';
+  retour.textContent = 'Mon message';
+  retour.setAttribute('aria-pressed', 'true');
+  retour.addEventListener('click', () => montrerPhrase(null, retour));
+  zone.appendChild(retour);
+
+  liste.forEach((phrase) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = phrase;
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => montrerPhrase(phrase, b));
+    zone.appendChild(b);
+  });
+}
+
+function montrerPhrase(phrase, bouton) {
+  const message = $('#sos-message');
+  message.textContent = phrase === null ? remplir(reglages.messageCarte) : phrase;
+  message.classList.toggle('phrase', phrase !== null);
+  $$('#sos-phrases button').forEach((b) => b.setAttribute('aria-pressed', String(b === bouton)));
+  /* La phrase est en haut de l'écran : on y remonte, pour qu'elle soit
+     la première chose que l'autre personne voit. */
+  $('#carte-sos').scrollTop = 0;
+  annoncer(phrase === null ? 'Ton message est affiché.' : 'Affiché en grand : ' + phrase);
+}
+
 /* L'ouverture se fait dans l'instant même de l'appui : aucune attente,
    aucun calcul avant. C'est la condition pour qu'Android l'accepte. */
 $('#sos-envoyer').addEventListener('click', ouvrirSms);
@@ -452,6 +533,7 @@ $('#sos-fermer').addEventListener('click', () => {
   $('#sos-contraste').setAttribute('aria-pressed', 'false');
   $('#sos-contraste').textContent = 'Éclaircir pour le montrer';
   $('#sos-avertissement').classList.add('masque');
+  construirePhrases([]);
   /* On coupe le GPS et on oublie le point : il ne doit pas resservir
      lors d'une prochaine crise, ailleurs. */
   position.oublier();
@@ -653,6 +735,9 @@ const BDD = {
   /* --- Journal de crises (inchangé depuis la v1) --- */
   ajouter(entree) { return BDD.operation('crises', 'readwrite', (m) => m.add(entree)); },
   supprimer(id)   { return BDD.operation('crises', 'readwrite', (m) => m.delete(id)); },
+  /* put() remplace l'entrée qui porte le même id : c'est ainsi qu'on
+     complète une crise notée rapidement. Aucun changement de tiroir. */
+  modifier(entree) { return BDD.operation('crises', 'readwrite', (m) => m.put(entree)); },
   tout()          { return BDD.operation('crises', 'readonly',  (m) => m.getAll()); },
 
   /* --- Protocole : un unique enregistrement --- */
@@ -668,6 +753,10 @@ const BDD = {
 /* --- État du formulaire d'ajout --- */
 const brouillon = { duree: null, intensite: null, declencheurs: [] };
 
+/* L'entrée qu'on complète ou qu'on modifie (son id), ou null pour une
+   nouvelle entrée. */
+let criseEnEdition = null;
+
 /* Gère les groupes de boutons à choix unique (durée, intensité). */
 function choixUnique(idGroupe, surChoix) {
   $$('#' + idGroupe + ' button').forEach((b) => {
@@ -679,43 +768,163 @@ function choixUnique(idGroupe, surChoix) {
   });
 }
 
-/* Gère le groupe à choix multiples (déclencheurs). */
-function choixMultiple(idGroupe, surChoix) {
-  $$('#' + idGroupe + ' button').forEach((b) => {
-    b.setAttribute('aria-pressed', 'false');
-    b.addEventListener('click', () => {
-      const nouveau = b.getAttribute('aria-pressed') !== 'true';
-      b.setAttribute('aria-pressed', String(nouveau));
-      surChoix();
-    });
-  });
-}
-
 choixUnique('f-duree',     (b) => { brouillon.duree = Number(b.dataset.val); });
 choixUnique('f-intensite', (b) => { brouillon.intensite = Number(b.dataset.val); });
-choixMultiple('f-declencheurs', () => {
-  brouillon.declencheurs = $$('#f-declencheurs button[aria-pressed="true"]')
-    .map((b) => b.dataset.val);
+
+/* --- Déclencheurs ---
+   La liste de base, puis ceux que la personne ajoute elle-même (rangés
+   dans les réglages, un par ligne). « valeur » est ce qui est enregistré,
+   « texte » ce qui est écrit sur le bouton. */
+const DECLENCHEURS = [
+  { valeur: 'Bruit', texte: 'Bruit' },
+  { valeur: 'Lumière', texte: 'Lumière' },
+  { valeur: 'Foule', texte: 'Foule' },
+  { valeur: 'Odeur', texte: 'Odeur' },
+  { valeur: 'Contact physique', texte: 'Contact' },
+  { valeur: 'Imprévu', texte: 'Imprévu' },
+  { valeur: 'Fatigue', texte: 'Fatigue' },
+  { valeur: 'Interaction sociale', texte: 'Social' },
+  { valeur: 'Transport', texte: 'Transport' }
+];
+
+function declencheursPerso() {
+  return (reglages.declencheursPerso || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+/* Construit les boutons. « coches » : ce qui est déjà choisi. Un
+   déclencheur d'une ancienne entrée, effacé depuis de la liste
+   personnelle, est quand même montré : on ne perd rien en modifiant. */
+function construireDeclencheurs(coches) {
+  const liste = DECLENCHEURS.slice();
+  const connus = new Set(liste.map((d) => d.valeur));
+  declencheursPerso().concat(coches).forEach((v) => {
+    if (!connus.has(v)) { liste.push({ valeur: v, texte: v }); connus.add(v); }
+  });
+
+  const zone = $('#f-declencheurs');
+  zone.innerHTML = '';
+  liste.forEach((d) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.val = d.valeur;
+    b.textContent = d.texte;
+    b.setAttribute('aria-pressed', String(coches.includes(d.valeur)));
+    zone.appendChild(b);
+  });
+  brouillon.declencheurs = coches.slice();
+}
+
+/* Un seul écouteur pour tout le groupe : il sert aussi aux boutons
+   ajoutés plus tard. */
+$('#f-declencheurs').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-val]');
+  if (!b) return;
+  b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+  brouillon.declencheurs = $$('#f-declencheurs button[aria-pressed="true"]').map((x) => x.dataset.val);
 });
 
-/* Renvoie la date du jour au format attendu par le champ datetime-local. */
-function maintenantLocal() {
-  const d = new Date();
+function ajouterDeclencheur() {
+  const champ = $('#f-autre-declencheur');
+  const texte = champ.value.trim().slice(0, 40);
+  if (!texte) { champ.focus(); return; }
+  const perso = declencheursPerso();
+  const dejaLa = DECLENCHEURS.some((d) => d.valeur.toLowerCase() === texte.toLowerCase() || d.texte.toLowerCase() === texte.toLowerCase())
+    || perso.some((d) => d.toLowerCase() === texte.toLowerCase());
+  if (!dejaLa) {
+    perso.push(texte);
+    reglages.declencheursPerso = perso.join('\n');
+    sauverReglages();
+    $('#r-declencheurs').value = reglages.declencheursPerso;
+  }
+  /* Le nouveau déclencheur est coché tout de suite pour cette entrée. */
+  const valeur = (DECLENCHEURS.find((d) => d.valeur.toLowerCase() === texte.toLowerCase() || d.texte.toLowerCase() === texte.toLowerCase()) || {}).valeur
+    || perso.find((d) => d.toLowerCase() === texte.toLowerCase()) || texte;
+  const coches = brouillon.declencheurs.includes(valeur) ? brouillon.declencheurs : brouillon.declencheurs.concat(valeur);
+  construireDeclencheurs(coches);
+  champ.value = '';
+  annoncer(dejaLa ? 'Déclencheur coché : ' + valeur : 'Déclencheur ajouté et coché : ' + valeur);
+}
+
+$('#btn-ajouter-declencheur').addEventListener('click', ajouterDeclencheur);
+$('#f-autre-declencheur').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); ajouterDeclencheur(); }
+});
+
+/* Renvoie une date au format attendu par le champ datetime-local. */
+function versChampDate(ts) {
+  const d = new Date(ts);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 16);
 }
+function maintenantLocal() { return versChampDate(Date.now()); }
 
-function ouvrirFormulaire(ouvert) {
+/* Remplit le formulaire avec une entrée (pour la compléter), ou le
+   remet à zéro (entree = null) pour une nouvelle. */
+function remplirFormulaire(entree) {
+  const e = entree || {};
+  criseEnEdition = entree ? entree.id : null;
+  $('#titre-form-crise').textContent = !entree ? 'Nouvelle entrée'
+    : (estRapide(entree) ? 'Compléter l’entrée' : 'Modifier l’entrée');
+  $('#f-date').value = versChampDate(e.ts || Date.now());
+  brouillon.duree = e.duree || null;
+  brouillon.intensite = e.intensite || null;
+  $$('#f-duree button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.val) === brouillon.duree)));
+  $$('#f-intensite button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.val) === brouillon.intensite)));
+  construireDeclencheurs(Array.isArray(e.declencheurs) ? e.declencheurs : []);
+  $('#f-autre-declencheur').value = '';
+  $('#f-note').value = e.note || '';
+}
+
+function ouvrirFormulaire(ouvert, entree) {
   $('#form-crise').classList.toggle('masque', !ouvert);
   $('#btn-nouvelle').classList.toggle('masque', ouvert);
+  $('#btn-noter-vite').classList.toggle('masque', ouvert);
+  messageJournal('');
   if (ouvert) {
-    $('#f-date').value = maintenantLocal();
-    $('#f-date').focus();
+    remplirFormulaire(entree || null);
+    $('#form-crise').scrollIntoView({ block: 'start' });
+    $('#f-date').focus({ preventScroll: true });
+  } else {
+    criseEnEdition = null;
   }
 }
 
 $('#btn-nouvelle').addEventListener('click', () => ouvrirFormulaire(true));
 $('#btn-annuler').addEventListener('click', () => ouvrirFormulaire(false));
+
+/* Message visible en haut du journal (après une note rapide, par exemple). */
+function messageJournal(texte) {
+  const zone = $('#journal-message');
+  zone.textContent = texte;
+  zone.classList.toggle('masque', !texte);
+}
+
+/* Une entrée « rapide » n'a que son heure : rien d'autre n'a été noté. */
+function estRapide(c) {
+  return !c.duree && !c.intensite && !(c.declencheurs && c.declencheurs.length) && !c.note;
+}
+
+/* Noter une crise en un seul appui : après une crise, l'énergie manque
+   pour remplir un formulaire. Seule l'heure est gardée ; le reste peut
+   attendre, ou ne jamais venir. */
+$('#btn-noter-vite').addEventListener('click', async () => {
+  const ts = Date.now();
+  try {
+    await BDD.ajouter({ ts: ts, duree: null, intensite: null, declencheurs: [], note: '' });
+    await afficherCrises();
+    const texte = 'Crise notée à ' + HEURE_COURTE.format(new Date(ts))
+      + '. Tu pourras la compléter plus tard, si tu veux.';
+    messageJournal(texte);
+    annoncer(texte);
+  } catch (err) {
+    messageJournal("L'enregistrement a échoué.");
+    annoncer("L'enregistrement a échoué.");
+    console.error(err);
+  }
+});
 
 $('#form-crise').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -726,16 +935,15 @@ $('#form-crise').addEventListener('submit', async (e) => {
     declencheurs: brouillon.declencheurs.slice(),
     note: $('#f-note').value.trim()
   };
+  const enEdition = criseEnEdition;
   try {
-    await BDD.ajouter(entree);
-    /* Remise à zéro du formulaire pour la prochaine fois. */
-    brouillon.duree = null; brouillon.intensite = null; brouillon.declencheurs = [];
-    $$('#f-duree button, #f-intensite button, #f-declencheurs button')
-      .forEach((b) => b.setAttribute('aria-pressed', 'false'));
-    $('#f-note').value = '';
+    if (enEdition !== null) await BDD.modifier({ ...entree, id: enEdition });
+    else await BDD.ajouter(entree);
     ouvrirFormulaire(false);
-    afficherCrises();
-    annoncer('Entrée enregistrée.');
+    /* Remise à zéro du formulaire pour la prochaine fois. */
+    remplirFormulaire(null);
+    await afficherCrises();
+    annoncer(enEdition !== null ? 'Entrée mise à jour.' : 'Entrée enregistrée.');
   } catch (err) {
     annoncer("L'enregistrement a échoué.");
     console.error(err);
@@ -759,6 +967,7 @@ async function afficherCrises() {
 
   const conteneur = $('#liste-crises');
   $('#outils-journal').classList.toggle('masque', liste.length === 0);
+  afficherBilan(liste);
 
   if (liste.length === 0) {
     conteneur.innerHTML =
@@ -807,6 +1016,23 @@ async function afficherCrises() {
       note.textContent = c.note;
       bloc.appendChild(note);
     }
+    if (estRapide(c)) {
+      const rapide = document.createElement('p');
+      rapide.className = 'meta';
+      rapide.textContent = 'Notée rapidement. À compléter quand tu veux, ou jamais.';
+      bloc.appendChild(rapide);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'actions-entree';
+
+    const completer = document.createElement('button');
+    completer.type = 'button';
+    completer.className = 'supprimer';
+    completer.textContent = estRapide(c) ? 'Compléter' : 'Modifier';
+    completer.setAttribute('aria-label', completer.textContent + " l'entrée du " + FORMAT_DATE.format(new Date(c.ts)));
+    completer.addEventListener('click', () => ouvrirFormulaire(true, c));
+    actions.appendChild(completer);
 
     const sup = document.createElement('button');
     sup.type = 'button';
@@ -827,10 +1053,43 @@ async function afficherCrises() {
       afficherCrises();
       annoncer('Entrée supprimée.');
     });
-    bloc.appendChild(sup);
+    actions.appendChild(sup);
+    bloc.appendChild(actions);
 
     conteneur.appendChild(bloc);
   });
+}
+
+/* --- Ce qui revient le plus souvent ---
+   Une phrase simple, calculée sur ce téléphone, à partir des trois
+   derniers mois : combien de crises notées, et les déclencheurs les plus
+   fréquents. De quoi repérer ce qu'on peut éviter, et en parler avec un
+   professionnel. Pas de graphique : quelques mots suffisent. */
+const TROIS_MOIS_MS = 91 * 24 * 60 * 60 * 1000;
+
+function afficherBilan(liste) {
+  const depuis = Date.now() - TROIS_MOIS_MS;
+  const recentes = liste.filter((c) => c.ts >= depuis);
+  const carte = $('#bilan-journal');
+  carte.classList.toggle('masque', recentes.length === 0);
+  if (!recentes.length) return;
+
+  const compte = new Map();
+  recentes.forEach((c) => (c.declencheurs || []).forEach((d) => {
+    compte.set(d, (compte.get(d) || 0) + 1);
+  }));
+  const tri = Array.from(compte.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr'))
+    .slice(0, 3);
+
+  let texte = recentes.length + (recentes.length > 1 ? ' crises notées.' : ' crise notée.');
+  if (tri.length) {
+    texte += ' Ce qui revient le plus souvent : '
+      + tri.map(([d, n]) => d + ' (' + n + ' fois)').join(', ') + '.';
+  } else {
+    texte += ' Aucun déclencheur noté pour l’instant.';
+  }
+  $('#bilan-texte').textContent = texte;
 }
 
 /* --- Export des données --- */
@@ -1164,6 +1423,8 @@ function initReglages() {
   lierTexte('#r-tel', 'tel');
   lierTexte('#r-message', 'messageSms');
   lierTexte('#r-carte', 'messageCarte');
+  lierTexte('#r-phrases', 'phrases');
+  lierTexte('#r-declencheurs', 'declencheursPerso');
 
   lierCase('#r-theme-clair', 'themeClair', appliquerTheme);
   lierCase('#r-bouclier-demarrage', 'bouclierAuDemarrage');
@@ -1184,6 +1445,19 @@ function initReglages() {
     reglages.echelle = Number(b.dataset.echelle);
     sauverReglages();
     appliquerTheme();
+  });
+
+  choixUnique('choix-palette', (b) => {
+    reglages.palette = b.dataset.palette;
+    sauverReglages();
+    appliquerTheme();
+  });
+
+  $('#btn-defaut-phrases').addEventListener('click', () => {
+    reglages.phrases = PHRASES_DEFAUT;
+    $('#r-phrases').value = PHRASES_DEFAUT;
+    sauverReglages();
+    annoncer("Phrases d'origine rétablies.");
   });
 
   $('#btn-defaut-message').addEventListener('click', () => {
@@ -1211,6 +1485,7 @@ function initReglages() {
     });
   };
   marquer('choix-taille', 'echelle', reglages.echelle);
+  marquer('choix-palette', 'palette', reglages.palette);
   marquer('choix-rythme', 'preset', reglages.rythme);
   marquer('choix-duree', 'min', reglages.dureeRespi);
   $('#desc-rythme').innerHTML = '<small>' + RYTHMES[reglages.rythme].description + '</small>';
@@ -1322,10 +1597,65 @@ const THEMES_PROTOCOLE = [
   }
 ];
 
+/* ------------------------------------------------------------
+   QUAND JE SENS QUE ÇA MONTE
+   ------------------------------------------------------------
+   Une partie POUR SOI, pas pour les autres : elle ne va jamais sur la
+   carte de l'écran verrouillé. On y note, au calme, ses premiers signes
+   et ce qui aide tant qu'il est encore temps. On la relit depuis
+   l'accueil (bouton « Quand ça monte »), au moment où ça arrive.
+
+   Mêmes règles que THEMES_PROTOCOLE : phrases à la première personne,
+   de l'information et jamais une consigne médicale, et les « id » ne
+   changent JAMAIS une fois publiés (ce sont eux qui retiennent les cases
+   cochées). Le texte, lui, peut être réécrit.
+   ------------------------------------------------------------ */
+
+const THEMES_MONTEE = [
+  {
+    id: 'actions',
+    titre: 'Ce que je peux faire',
+    aide: "Ce qui m'aide tant qu'il est encore temps.",
+    propositions: [
+      { id: 'action-casque',    texte: 'Mettre mon casque ou mes bouchons d’oreilles' },
+      { id: 'action-lunettes',  texte: 'Mettre mes lunettes de soleil' },
+      { id: 'action-isoler',    texte: 'Aller dans un endroit calme, même cinq minutes' },
+      { id: 'action-pause',     texte: "Dire que j'ai besoin d'une pause" },
+      { id: 'action-partir',    texte: 'Partir plus tôt, sans me justifier' },
+      { id: 'action-eau',       texte: "Boire un verre d'eau" },
+      { id: 'action-objet',     texte: 'Prendre un objet à manipuler dans les mains' },
+      { id: 'action-prevenir',  texte: "Prévenir quelqu'un de confiance" },
+      { id: 'action-respirer',  texte: 'Respirer avec Refuge' },
+      { id: 'action-bouclier',  texte: 'Allumer le bouclier sensoriel' }
+    ]
+  },
+  {
+    id: 'signes',
+    titre: 'Mes premiers signes',
+    aide: "Ce que je remarque en moi quand une crise approche.",
+    propositions: [
+      { id: 'signe-bruits',     texte: "Les bruits me semblent plus forts que d'habitude" },
+      { id: 'signe-lumiere',    texte: 'La lumière me gêne, je plisse les yeux' },
+      { id: 'signe-suivre',     texte: "Je n'arrive plus à suivre une conversation" },
+      { id: 'signe-mots',       texte: 'Les mots me viennent plus difficilement' },
+      { id: 'signe-irritable',  texte: "Je deviens irritable, tout m'agace" },
+      { id: 'signe-bouger',     texte: "J'ai besoin de bouger, de me balancer" },
+      { id: 'signe-fige',       texte: 'Je me fige, je ne sais plus quoi faire' },
+      { id: 'signe-chaud',      texte: "J'ai chaud, mon cœur bat plus vite" },
+      { id: 'signe-partir',     texte: "J'ai envie de partir tout de suite" },
+      { id: 'signe-repeter',    texte: 'Je répète les mêmes gestes ou les mêmes mots' }
+    ]
+  }
+];
+
+const monteVide = () => ({ coches: [], libres: {} });
+
 /* Ce que Refuge retient de vos choix. « coches » est une liste d'id,
    « libres » vos propres lignes, thème par thème, et « fond » le fond
-   choisi pour la carte image (voir section 10) : 'sombre' ou 'clair'. */
-let protocole = { coches: [], libres: {}, contactNom: '', contactTel: '', fond: 'sombre' };
+   choisi pour la carte image (voir section 10) : 'sombre' ou 'clair'.
+   « monte » garde la partie « Quand je sens que ça monte », sur le même
+   modèle (coches et lignes libres). */
+let protocole = { coches: [], libres: {}, contactNom: '', contactTel: '', fond: 'sombre', monte: monteVide() };
 
 /* L'écriture dans la base est différée de quelques centièmes de seconde :
    taper dans un champ libre déclencherait sinon une écriture par lettre. */
@@ -1425,6 +1755,7 @@ function afficherProtocole() {
     b.setAttribute('aria-pressed', String(b.dataset.fond === protocole.fond));
   });
   majResumeProtocole();
+  afficherMonte();
 }
 
 /* Les lignes libres d'un thème, nettoyées : une par ligne, sans vide. */
@@ -1475,8 +1806,154 @@ function majResumeProtocole() {
   }
 }
 
+/* --- Quand je sens que ça monte : construction, lecture, écran --- */
+
+/* Vérifie ce qui vient de la base ou d'un fichier. null si absent. */
+function nettoyerMonte(m) {
+  if (!m || typeof m !== 'object') return null;
+  const libres = {};
+  if (m.libres && typeof m.libres === 'object') {
+    Object.keys(m.libres).forEach((cle) => {
+      if (typeof m.libres[cle] === 'string') libres[cle] = m.libres[cle];
+    });
+  }
+  return {
+    coches: Array.isArray(m.coches) ? m.coches.filter((x) => typeof x === 'string') : [],
+    libres: libres
+  };
+}
+
+function construireMonte() {
+  const conteneur = $('#monte-themes');
+  conteneur.innerHTML = '';
+
+  THEMES_MONTEE.forEach((theme) => {
+    const titre = document.createElement('h3');
+    titre.textContent = theme.titre;
+    titre.style.marginTop = '18px';
+    conteneur.appendChild(titre);
+
+    const aide = document.createElement('p');
+    aide.innerHTML = '<small></small>';
+    aide.firstChild.textContent = theme.aide;
+    conteneur.appendChild(aide);
+
+    theme.propositions.forEach((prop) => {
+      const ligne = document.createElement('label');
+      ligne.className = 'proposition';
+      ligne.setAttribute('for', 'monte-' + prop.id);
+
+      const coche = document.createElement('input');
+      coche.type = 'checkbox';
+      coche.id = 'monte-' + prop.id;
+      coche.dataset.monte = prop.id;
+      coche.addEventListener('change', () => {
+        const liste = protocole.monte.coches;
+        const dedans = liste.indexOf(prop.id);
+        if (coche.checked && dedans === -1) liste.push(prop.id);
+        if (!coche.checked && dedans !== -1) liste.splice(dedans, 1);
+        enregistrerProtocole();
+        majEntreeMonte();
+      });
+
+      const texte = document.createElement('span');
+      texte.textContent = prop.texte;
+      ligne.appendChild(coche);
+      ligne.appendChild(texte);
+      conteneur.appendChild(ligne);
+    });
+
+    const etiquette = document.createElement('label');
+    etiquette.setAttribute('for', 'monte-libre-' + theme.id);
+    etiquette.textContent = 'Mes propres mots (une ligne par idée)';
+    etiquette.style.marginTop = '14px';
+
+    const champ = document.createElement('textarea');
+    champ.id = 'monte-libre-' + theme.id;
+    champ.className = 'champ-libre';
+    champ.placeholder = 'Facultatif';
+    champ.addEventListener('input', () => {
+      protocole.monte.libres[theme.id] = champ.value;
+      enregistrerProtocole();
+      majEntreeMonte();
+    });
+    conteneur.appendChild(etiquette);
+    conteneur.appendChild(champ);
+  });
+}
+
+function afficherMonte() {
+  $$('#monte-themes input[type="checkbox"]').forEach((c) => {
+    c.checked = protocole.monte.coches.includes(c.dataset.monte);
+  });
+  THEMES_MONTEE.forEach((theme) => {
+    const champ = $('#monte-libre-' + theme.id);
+    if (champ) champ.value = protocole.monte.libres[theme.id] || '';
+  });
+  majEntreeMonte();
+}
+
+/* Les lignes d'un thème : d'abord les propositions cochées, puis ses
+   propres mots, une par ligne. */
+function lignesMonte(idTheme) {
+  const theme = THEMES_MONTEE.find((t) => t.id === idTheme);
+  const monte = protocole.monte || monteVide();
+  const lignes = theme.propositions.filter((p) => monte.coches.includes(p.id)).map((p) => p.texte);
+  (monte.libres[idTheme] || '').split('\n').map((l) => l.trim()).filter(Boolean)
+    .forEach((l) => lignes.push(l));
+  return lignes;
+}
+
+/* Le bouton de l'accueil n'existe que si la partie a été remplie, et
+   jamais en bouclier. */
+function majEntreeMonte() {
+  const rempli = lignesMonte('actions').length + lignesMonte('signes').length > 0;
+  $('#btn-monte').classList.toggle('masque', !rempli || bouclierActif);
+}
+
+function ouvrirEcranMonte(ouvert) {
+  const ecran = $('#ecran-monte');
+  ecran.hidden = !ouvert;
+  if (!ouvert) {
+    if ($('#btn-monte').offsetParent) $('#btn-monte').focus();
+    return;
+  }
+  [['actions', '#monte-actions'], ['signes', '#monte-signes']].forEach(([id, sel]) => {
+    const lignes = lignesMonte(id);
+    const liste = $(sel);
+    liste.innerHTML = '';
+    lignes.forEach((l) => {
+      const li = document.createElement('li');
+      li.textContent = l;
+      liste.appendChild(li);
+    });
+    $(sel + '-bloc').classList.toggle('masque', lignes.length === 0);
+  });
+  /* Deux raccourcis, seulement si la personne les a cochés elle-même. */
+  const coches = protocole.monte.coches;
+  $('#monte-respirer').classList.toggle('masque', !coches.includes('action-respirer'));
+  $('#monte-bouclier').classList.toggle('masque', !coches.includes('action-bouclier'));
+  ecran.focus({ preventScroll: true });
+  ecran.scrollTop = 0;
+  annoncer('Quand ça monte.');
+}
+
+$('#btn-monte').addEventListener('click', () => ouvrirEcranMonte(true));
+$('#monte-fermer').addEventListener('click', () => ouvrirEcranMonte(false));
+$('#monte-respirer').addEventListener('click', () => {
+  ouvrirEcranMonte(false);
+  allerA('respiration');
+  if (!respiration.enCours) respiration.demarrer();
+});
+$('#monte-bouclier').addEventListener('click', () => {
+  ouvrirEcranMonte(false);
+  activerBouclier(true);
+  $('#btn-bouclier').focus();
+});
+
 function initProtocole() {
   construireProtocole();
+  construireMonte();
 
   const lierContact = (idChamp, cle) => {
     const champ = $(idChamp);
@@ -1518,7 +1995,8 @@ function initProtocole() {
           libres: enregistre.libres || {},
           contactNom: enregistre.contactNom || '',
           contactTel: enregistre.contactTel || '',
-          fond: enregistre.fond === 'clair' ? 'clair' : 'sombre'
+          fond: enregistre.fond === 'clair' ? 'clair' : 'sombre',
+          monte: nettoyerMonte(enregistre.monte) || monteVide()
         };
       }
       afficherProtocole();
@@ -2144,7 +2622,10 @@ function nettoyerProtocole(p) {
     libres: libres,
     contactNom: texteOuVide(p.contactNom),
     contactTel: texteOuVide(p.contactTel),
-    fond: p.fond === 'clair' ? 'clair' : 'sombre'
+    fond: p.fond === 'clair' ? 'clair' : 'sombre',
+    /* null si le fichier date d'avant « Quand ça monte » (version 2.1) :
+       on garde alors ce qui est déjà sur le téléphone. */
+    monte: nettoyerMonte(p.monte)
   };
 }
 
@@ -2155,6 +2636,7 @@ function nettoyerReglages(r) {
     if (typeof r[cle] === typeof REGLAGES_DEFAUT[cle]) propre[cle] = r[cle];
   });
   if ('rythme' in propre && !RYTHMES[propre.rythme]) delete propre.rythme;
+  if ('palette' in propre && !PALETTES.includes(propre.palette)) delete propre.palette;
   if ('echelle' in propre && !(propre.echelle >= 0.5 && propre.echelle <= 2)) delete propre.echelle;
   /* 0 veut dire « Sans fin » : c'est une valeur valable. */
   if ('dureeRespi' in propre && !(propre.dureeRespi >= 0 && propre.dureeRespi <= 60)) delete propre.dureeRespi;
@@ -2289,7 +2771,11 @@ $('#btn-restaurer-confirmer').addEventListener('click', async () => {
       /* Une écriture différée du protocole en cours ne doit pas venir
          écraser ce qu'on restaure. */
       clearTimeout(minuteurProtocole);
-      await BDD.ecrireProtocole({ ...r.protocole, maj: Date.now() });
+      await BDD.ecrireProtocole({
+        ...r.protocole,
+        monte: r.protocole.monte || protocole.monte || monteVide(),
+        maj: Date.now()
+      });
     }
   } catch (err) {
     console.error(err);
