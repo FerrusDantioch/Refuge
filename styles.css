@@ -669,3 +669,10 @@ html[data-bouclier="on"] .phrases button[aria-pressed="true"] { background: #101
    ============================================================ */
 .onglet { font-size: 0.72rem; padding: 8px 2px; gap: 4px; }
 .onglet svg { width: 22px; height: 22px; }
+
+/* Note d'installation (section À propos) : inutile une fois l'application
+   installée, puisqu'elle s'ouvre alors dans sa propre fenêtre (mode
+   d'affichage autre que « browser », celui d'un onglet de navigateur). */
+@media not all and (display-mode: browser) {
+  .note-installation { display: none; }
+}
