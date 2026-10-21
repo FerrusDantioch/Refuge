@@ -2856,6 +2856,29 @@ async function demarrer() {
     navigator.serviceWorker.register('./sw.js')
       .catch((e) => console.warn('Mode hors-ligne indisponible.', e));
   }
+
+  demanderStockagePersistant();
+}
+
+/* Stockage persistant : par défaut, le navigateur peut effacer de lui-même
+   la copie hors-ligne (et le journal, les réglages) s'il manque de place ou
+   si l'application est peu utilisée. Elle ne s'ouvrirait alors plus sans
+   réseau, au pire moment. persist() lui demande de tout garder.
+   ⚠️ Certains navigateurs (Firefox) affichent une fenêtre d'autorisation pour
+   cela. Or Refuge ne doit JAMAIS faire surgir une demande d'autorisation au
+   démarrage, qui peut avoir lieu en pleine crise. On ne demande donc que si
+   le navigateur a déjà répondu « accordé » (state === 'granted') : c'est le
+   cas de Chrome pour une application installée, et il n'affiche alors rien.
+   Dans tous les autres cas, on renonce en silence. */
+function demanderStockagePersistant() {
+  if (!navigator.storage || !navigator.storage.persist || !navigator.permissions) return;
+  navigator.storage.persisted()
+    .then((dejaPersistant) => {
+      if (dejaPersistant) return;
+      return navigator.permissions.query({ name: 'persistent-storage' })
+        .then((etat) => { if (etat.state === 'granted') return navigator.storage.persist(); });
+    })
+    .catch(() => {});
 }
 
 demarrer();
