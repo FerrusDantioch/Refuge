@@ -168,7 +168,9 @@ function allerA(nom) {
   $$('.onglet').forEach((o) => {
     o.setAttribute('aria-selected', String(o.dataset.vue === nom));
   });
-  $('main').scrollTop = 0;
+  /* Chaque onglet s'ouvre en haut de sa page. C'est la page entière qui
+     défile, pas seulement <main> : on remonte donc la fenêtre elle-même. */
+  window.scrollTo(0, 0);
 
   /* Par respect du calme : quitter l'onglet respiration arrête la séance. */
   if (nom !== 'respiration' && respiration.enCours) respiration.arreter();
@@ -1129,11 +1131,14 @@ $('#btn-export-json').addEventListener('click', enregistrerSauvegarde);
    6. RESPIRATION GUIDÉE
    ============================================================ */
 
+/* Les descriptions disent comment se déroule chaque rythme, sans promesse
+   de santé : Refuge n'est pas un dispositif médical. Le texte de la
+   cohérence est aussi écrit dans index.html (affiché avant ce script). */
 const RYTHMES = {
   coherence: {
     nom: 'Cohérence 5-5',
-    description: "Inspirer 5 secondes, expirer 5 secondes. Le rythme de la cohérence " +
-                 "cardiaque : c'est celui qui apaise le plus vite le système nerveux.",
+    description: "Inspirer 5 secondes, expirer 5 secondes. C'est le rythme dit de " +
+                 "« cohérence cardiaque » : régulier, simple à suivre.",
     phases: [
       { texte: 'Inspire',    duree: 5, vers: 1    },
       { texte: 'Expire',     duree: 5, vers: 0.45 }
@@ -1141,8 +1146,8 @@ const RYTHMES = {
   },
   apaisant: {
     nom: 'Apaisant 4-7-8',
-    description: "Inspirer 4 secondes, retenir 7, expirer 8. L'expiration longue " +
-                 "envoie au corps un signal de sécurité. Idéal pour redescendre.",
+    description: "Inspirer 4 secondes, retenir 7, expirer 8. L'expiration est longue : " +
+                 "beaucoup de personnes la trouvent apaisante pour redescendre.",
     phases: [
       { texte: 'Inspire',    duree: 4, vers: 1    },
       { texte: 'Retiens',    duree: 7, vers: 1    },
@@ -1183,6 +1188,7 @@ const respiration = {
     this.enCours = true;
     this.indexPhase = 0;
     $('#btn-respi').textContent = 'Arrêter';
+    majVerrouEcran();   /* l'écran reste allumé pendant la séance (section 7) */
 
     const minutes = reglages.dureeRespi;
     this.finPrevue = minutes > 0 ? Date.now() + minutes * 60000 : 0;
@@ -1245,6 +1251,7 @@ const respiration = {
 
   arreter() {
     this.enCours = false;
+    majVerrouEcran();   /* fin de séance : l'écran peut de nouveau s'éteindre */
     clearTimeout(this.minuteur);
     clearInterval(this.tictac);
     if (this.animation) {
@@ -1290,18 +1297,39 @@ document.addEventListener('visibilitychange', () => {
 
 /* ============================================================
    7. GARDER L'ÉCRAN ALLUMÉ (Wake Lock)
+   ------------------------------------------------------------
+   Deux raisons de garder l'écran allumé :
+   • la personne l'a demandé dans les Réglages ;
+   • une séance de respiration est en cours. Sans cela, Android
+     éteint l'écran après quelques dizaines de secondes sans
+     toucher (30 s sur beaucoup de Xiaomi), et la séance s'arrête
+     en plein milieu. L'écran est rendu dès la fin de la séance.
    ============================================================ */
 
 let verrouEcran = null;
 
+function ecranAGarderAllume() {
+  return reglages.ecranAllume || respiration.enCours;
+}
+
 async function majVerrouEcran() {
   try {
-    if (reglages.ecranAllume && !verrouEcran && 'wakeLock' in navigator) {
-      verrouEcran = await navigator.wakeLock.request('screen');
-      verrouEcran.addEventListener('release', () => { verrouEcran = null; });
-    } else if (!reglages.ecranAllume && verrouEcran) {
-      await verrouEcran.release();
+    if (ecranAGarderAllume() && !verrouEcran && 'wakeLock' in navigator) {
+      const verrou = await navigator.wakeLock.request('screen');
+      /* Pendant cette courte attente, la séance a pu s'arrêter, ou un
+         autre verrou a été pris : celui-ci ne sert plus, on le rend. */
+      if (verrouEcran || !ecranAGarderAllume()) { verrou.release(); return; }
+      verrouEcran = verrou;
+      verrou.addEventListener('release', () => {
+        if (verrouEcran === verrou) verrouEcran = null;
+      });
+    } else if (!ecranAGarderAllume() && verrouEcran) {
+      /* On l'oublie AVANT d'attendre qu'il soit rendu : une séance qui
+         redémarre aussitôt (changement de rythme) doit pouvoir en
+         prendre un nouveau, sans que l'ancien vienne l'effacer. */
+      const verrou = verrouEcran;
       verrouEcran = null;
+      await verrou.release();
     }
   } catch (e) {
     /* Non pris en charge ou refusé : ce n'est pas grave, on continue. */

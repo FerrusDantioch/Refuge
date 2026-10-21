@@ -269,12 +269,20 @@ button:active { background: var(--bord); }
 
 /* ---------- 5. Barre d'onglets ---------- */
 
+/* « sticky » : la barre reste collée en bas de l'écran pendant qu'on fait
+   défiler une page longue (Réglages, Protocole, Journal). Sans cela, elle
+   n'apparaissait qu'une fois arrivé tout en bas de la page. z-index : la
+   barre passe au-dessus du contenu qui défile, mais sous les écrans plein
+   écran (z-index 100). */
 .onglets {
   display: flex;
   background: var(--surface);
   border-top: 1px solid var(--bord);
   padding-bottom: env(safe-area-inset-bottom);
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .onglet {
