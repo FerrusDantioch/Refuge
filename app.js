@@ -168,7 +168,9 @@ function allerA(nom) {
   $$('.onglet').forEach((o) => {
     o.setAttribute('aria-selected', String(o.dataset.vue === nom));
   });
-  $('main').scrollTop = 0;
+  /* Chaque onglet s'ouvre en haut de sa page. C'est la page entière qui
+     défile, pas seulement <main> : on remonte donc la fenêtre elle-même. */
+  window.scrollTo(0, 0);
 
   /* Par respect du calme : quitter l'onglet respiration arrête la séance. */
   if (nom !== 'respiration' && respiration.enCours) respiration.arreter();
