@@ -116,6 +116,12 @@ déjà ouvert l'application continue de voir l'ancienne version**. En cas
 d'**ajout de fichier**, l'inscrire aussi dans la liste `FICHIERS` du même
 fichier. **Ne pas** incrémenter pour un changement hors cache (README, LICENSE).
 
+## Points en attente
+
+Les points relevés par l'audit d'octobre 2026 et pas encore traités sont
+listés dans `A-FAIRE.md`, à la racine. Cocher ou retirer une ligne quand elle
+est réglée.
+
 ## Tester en local
 
 Ce dépôt ne contient pas de serveur de test. Un service worker ne fonctionne
