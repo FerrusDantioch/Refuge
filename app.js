@@ -32,6 +32,11 @@ const MESSAGE_CARTE_DEFAUT =
   "Je fais une crise d'autisme, je ne peux pas parler.\n\n" +
   "Merci de me laisser de l'espace, ou d'appeler [Contact] au [Numéro].";
 
+/* Le même message, quand aucun numéro n'est enregistré : voir messageAMontrer(). */
+const MESSAGE_CARTE_SANS_CONTACT =
+  "Je fais une crise d'autisme, je ne peux pas parler.\n\n" +
+  "Merci de me laisser de l'espace.";
+
 /* Les phrases courtes de « Montrer un message ». Elles s'adressent aux
    gens autour : elles gardent le « vous », comme le message affiché. */
 const PHRASES_DEFAUT = [
@@ -99,6 +104,17 @@ function remplir(texte) {
     .replaceAll('[Numéro]', reglages.tel || '')
     .replaceAll('[Numero]', reglages.tel || '')
     .replaceAll('[Position]', '');
+}
+
+/* Le message affiché en grand. Sans numéro enregistré, le texte d'origine
+   finirait par « … d'appeler mon contact au . » : une phrase cassée, montrée
+   à un inconnu. On affiche alors la version sans contact. Un message que la
+   personne a écrit elle-même est toujours affiché tel quel. */
+function messageAMontrer() {
+  if (reglages.messageCarte === MESSAGE_CARTE_DEFAUT && !numeroPropre(reglages.tel)) {
+    return MESSAGE_CARTE_SANS_CONTACT;
+  }
+  return remplir(reglages.messageCarte);
 }
 
 
@@ -416,7 +432,7 @@ function majLignePosition() {
      téléphone à quelqu'un : aucune action n'y figure, personne ne peut
      déclencher un appel par mégarde. */
 function afficherCarteSos(avecActions) {
-  $('#sos-message').textContent = remplir(reglages.messageCarte);
+  $('#sos-message').textContent = messageAMontrer();
   $('#sos-message').classList.remove('phrase');
 
   /* Les phrases courtes ne servent qu'à « Montrer un message » : sur la
@@ -457,7 +473,17 @@ function afficherCarteSos(avecActions) {
   if (montrerEnvoi) position.demarrer(); else position.oublier();
   majLignePosition();
 
-  (montrerEnvoi ? btnEnvoi : $('#sos-fermer')).focus();
+  /* Sans SMS à envoyer, le focus va au bouton « Fermer », mais SANS faire
+     défiler (preventScroll) : ce bouton est tout en bas, et la carte
+     s'ouvrait sinon déjà descendue, le début du message coupé en haut.
+     Or c'est la première phrase que l'autre personne doit lire. Même
+     piège que pour les numéros d'urgence. */
+  if (montrerEnvoi) {
+    btnEnvoi.focus();
+  } else {
+    $('#sos-fermer').focus({ preventScroll: true });
+    $('#carte-sos').scrollTop = 0;
+  }
   annoncer(avecActions ? 'Message affiché, avec les actions.' : 'Message affiché en grand.');
 }
 
@@ -516,7 +542,7 @@ function construirePhrases(liste) {
 
 function montrerPhrase(phrase, bouton) {
   const message = $('#sos-message');
-  message.textContent = phrase === null ? remplir(reglages.messageCarte) : phrase;
+  message.textContent = phrase === null ? messageAMontrer() : phrase;
   message.classList.toggle('phrase', phrase !== null);
   $$('#sos-phrases button').forEach((b) => b.setAttribute('aria-pressed', String(b === bouton)));
   /* La phrase est en haut de l'écran : on y remonte, pour qu'elle soit
