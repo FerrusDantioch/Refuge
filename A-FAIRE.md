@@ -11,11 +11,11 @@ Durée estimée : **rapide** (moins d'une heure), **moyen** (une demi-journée),
 
 ## À vérifier sur le téléphone
 
-- [ ] **Respiration et mise en veille** *(corrigé en octobre 2026, testé
-      seulement sur ordinateur)*. Dans Réglages, décocher « Garder l'écran
-      allumé ». Lancer une séance de 3 minutes sans toucher le téléphone :
-      l'écran doit rester allumé jusqu'à « C'est fini », puis s'éteindre
-      normalement.
+- [x] **Respiration et mise en veille** *(corrigé en octobre 2026)*. Dans
+      Réglages, décocher « Garder l'écran allumé ». Lancer une séance de
+      3 minutes sans toucher le téléphone : l'écran doit rester allumé
+      jusqu'à « C'est fini », puis s'éteindre normalement.
+      ✅ Vérifié sur le téléphone de Johan le 21 octobre 2026 : ça fonctionne.
 - [ ] **Bouton « retour » d'Android**. Avec Refuge installée, ouvrir
       « Montrer un message », puis faire le geste retour. Si toute
       l'application se ferme au lieu du seul message, c'est le point 1
