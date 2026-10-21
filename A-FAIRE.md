@@ -88,12 +88,16 @@ Durée estimée : **rapide** (moins d'une heure), **moyen** (une demi-journée),
 - Une adresse avec un `?vue=` inconnu (par exemple
   `index.html?vue=abc`) affiche un écran vide.
 
-### 8. Petits textes — *rapide*
-- Les apostrophes sont mélangées (’ et ') : on le voit par exemple sur la
-  carte de l'écran verrouillé.
-- Dans le journal, le choix « 2 h + » s'affiche « 2 heures ».
-- `manifest.json` range l'application dans la catégorie « medical », alors
-  que Refuge n'est pas un dispositif médical.
+### 8. Petits textes — *rapide* — ✅ *réglé en octobre 2026*
+- ✅ *Réglé en octobre 2026.* Les apostrophes étaient mélangées (’ et ') :
+  on le voyait par exemple sur la carte de l'écran verrouillé. Tous les
+  textes affichés utilisent maintenant l'apostrophe droite (').
+- ✅ *Réglé en octobre 2026.* Dans le journal, le choix « 2 h + »
+  s'affichait « 2 heures ». Il s'affiche maintenant « 2 h ou plus ».
+- ✅ *Réglé en octobre 2026.* `manifest.json` rangeait l'application dans
+  la catégorie « medical », alors que Refuge n'est pas un dispositif
+  médical. Cette catégorie est retirée ; restent « health » et
+  « lifestyle ».
 
 ### 9. Garantir « rien ne sort du téléphone » par construction — *moyen*
 - **Piste** : ajouter dans `index.html` une règle de sécurité (CSP,
@@ -107,10 +111,12 @@ Durée estimée : **rapide** (moins d'une heure), **moyen** (une demi-journée),
 
 ## Documentation (sans effet sur l'application)
 
-- [ ] `CLAUDE.md` cite encore `refuge-v14` comme exemple de version du
+- [x] `CLAUDE.md` cite encore `refuge-v14` comme exemple de version du
       cache. La version actuelle est dans `sw.js`.
-- [ ] `README.md` parle d'un fichier `refuge-github.zip` qui n'existe plus,
+      *(corrigé en octobre 2026 : l'exemple renvoie au numéro de `sw.js`)*
+- [x] `README.md` parle d'un fichier `refuge-github.zip` qui n'existe plus,
       et d'un dépôt nommé `refuge` alors que le vrai s'appelle `Refuge`.
+      *(corrigé en octobre 2026, dans `GUIDE-GITHUB.md` aussi)*
 
 ---
 

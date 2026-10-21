@@ -14,26 +14,27 @@ de commande.
 
 1. Ouvrez **github.com** dans Chrome, connectez-vous.
 2. Touchez le **+** en haut à droite → **New repository**.
-3. **Repository name** : `refuge`
+3. **Repository name** : `Refuge`
 4. Cochez **Public**. *(GitHub Pages n'est gratuit que sur les dépôts publics.)*
 5. Ne cochez rien d'autre. Touchez **Create repository**.
 
 ### 2. Envoyer les fichiers
 
-1. Décompressez `refuge-github.zip` sur votre téléphone
-   (Gestionnaire de fichiers → appui long sur le zip → **Extraire**).
+1. Rangez dans un même dossier de votre téléphone les fichiers de ce dépôt.
+   Il en faut **8** pour que l'application fonctionne : ceux du tableau
+   « Les fichiers », plus bas.
 2. Sur la page de votre dépôt, touchez **Add file** → **Upload files**.
    *Si vous ne voyez pas ce bouton : menu ⋮ de Chrome → cochez
    « Version pour ordinateur ».*
-3. Touchez **choose your files**, ouvrez le dossier décompressé, puis
+3. Touchez **choose your files**, ouvrez ce dossier, puis
    **sélectionnez les 8 fichiers** (appui long sur le premier, puis touchez
-   les autres). Vous pouvez ajouter ce `README.md` en 9ᵉ, si vous voulez.
+   les autres). Les fichiers de documentation (`README.md`, `LICENSE`…) sont
+   facultatifs : ajoutez-les si vous voulez.
 4. Descendez, touchez **Commit changes**.
 
 > ⚠️ Les fichiers doivent être **à la racine** du dépôt, pas dans un
 > sous-dossier. C'est pour cela que cette version n'a pas de dossier `icons/`.
-> L'envoi depuis un téléphone ne sait pas créer de sous-dossier : prenez
-> toujours la variante **à plat**.
+> L'envoi depuis un téléphone ne sait pas créer de sous-dossier.
 
 ### 3. Activer GitHub Pages
 
@@ -43,7 +44,7 @@ de commande.
 4. **Branch** : `main`, dossier `/ (root)`. Touchez **Save**.
 5. Patientez 1 à 2 minutes, puis rechargez la page : l'adresse apparaît en haut.
 
-Elle ressemble à : `https://votre-pseudo.github.io/refuge/`
+Elle ressemble à : `https://votre-pseudo.github.io/Refuge/`
 
 ### 4. Installer sur l'écran d'accueil
 
@@ -83,7 +84,7 @@ republie.
 Si Refuge est déjà en ligne et que vous voulez installer une nouvelle version
 (par exemple passer de la v1 à la v2) :
 
-1. Décompressez la nouvelle archive sur le téléphone.
+1. Rangez dans un même dossier du téléphone les nouveaux fichiers du dépôt.
 2. Sur votre dépôt GitHub : **Add file** → **Upload files**.
 3. Sélectionnez les **mêmes 8 fichiers** que la première fois. GitHub
    **remplace** les anciens automatiquement : il n'y a rien à supprimer.
