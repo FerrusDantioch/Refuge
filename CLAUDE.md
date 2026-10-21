@@ -104,11 +104,12 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
 ## ⚠️ Avant de pousser : incrémenter la version du service worker
 
 Après toute modification d'un fichier **mis en cache** (`index.html`, `app.js`,
-`styles.css`, `manifest.json`, icônes), incrémenter la constante en haut de
-`sw.js` :
+`styles.css`, `manifest.json`, icônes), incrémenter d'un cran la constante en
+haut de `sw.js`. Partir du numéro qui y figure aujourd'hui, jamais d'un
+exemple écrit ailleurs :
 
 ```js
-const CACHE = 'refuge-v14';   // → v15
+const CACHE = 'refuge-vN';   // N = numéro actuel dans sw.js → 'refuge-vN+1'
 ```
 
 Sans ce changement, le navigateur ne retélécharge rien et **toute personne ayant

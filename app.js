@@ -895,7 +895,7 @@ function remplirFormulaire(entree) {
   const e = entree || {};
   criseEnEdition = entree ? entree.id : null;
   $('#titre-form-crise').textContent = !entree ? 'Nouvelle entrée'
-    : (estRapide(entree) ? 'Compléter l’entrée' : 'Modifier l’entrée');
+    : (estRapide(entree) ? "Compléter l'entrée" : "Modifier l'entrée");
   $('#f-date').value = versChampDate(e.ts || Date.now());
   brouillon.duree = e.duree || null;
   brouillon.intensite = e.intensite || null;
@@ -985,6 +985,7 @@ const FORMAT_DATE = new Intl.DateTimeFormat('fr-FR', {
 function texteDuree(min) {
   if (!min) return null;
   if (min < 60) return min + ' min';
+  if (min >= 120) return '2 h ou plus';   /* le bouton « 2 h + » du formulaire */
   return (min / 60) + (min === 60 ? ' heure' : ' heures');
 }
 
@@ -1115,7 +1116,7 @@ function afficherBilan(liste) {
     texte += ' Ce qui revient le plus souvent : '
       + tri.map(([d, n]) => d + ' (' + n + ' fois)').join(', ') + '.';
   } else {
-    texte += ' Aucun déclencheur noté pour l’instant.';
+    texte += " Aucun déclencheur noté pour l'instant.";
   }
   $('#bilan-texte').textContent = texte;
 }
@@ -1624,19 +1625,19 @@ const THEMES_PROTOCOLE = [
     titre: "Ce qui m'apaise",
     aide: "Mes outils. Ils ont l'air étranges vus de l'extérieur : ils servent.",
     propositions: [
-      { id: 'sens-casque',     texte: 'Me laisser mettre mon casque ou mes bouchons d’oreilles' },
+      { id: 'sens-casque',     texte: "Me laisser mettre mon casque ou mes bouchons d'oreilles" },
       { id: 'sens-lunettes',   texte: "Me laisser mes lunettes de soleil, même à l'intérieur" },
       { id: 'sens-balancer',   texte: "Me laisser me balancer ou bouger les mains : c'est ce qui me calme" },
-      { id: 'sens-couverture', texte: 'Une couverture ou un vêtement lourd posé sur moi m’aide' },
+      { id: 'sens-couverture', texte: "Une couverture ou un vêtement lourd posé sur moi m'aide" },
       { id: 'sens-eau',        texte: "Un verre d'eau fraîche m'aide" },
-      { id: 'sens-objet',      texte: 'Un objet à manipuler dans les mains m’aide' },
+      { id: 'sens-objet',      texte: "Un objet à manipuler dans les mains m'aide" },
       { id: 'sens-yeux',       texte: 'Me laisser garder les yeux fermés' },
       { id: 'sens-telephone',  texte: "Me laisser mon téléphone : c'est avec lui que je communique" }
     ]
   },
   {
     id: 'autres',
-    titre: 'Ce qu’il faut savoir',
+    titre: "Ce qu'il faut savoir",
     aide: "De quoi éviter les malentendus, et les gestes de secours inutiles.",
     propositions: [
       { id: 'autre-pas-danger',    texte: 'Je ne suis pas en danger : cela passe avec du calme' },
@@ -1646,7 +1647,7 @@ const THEMES_PROTOCOLE = [
       { id: 'autre-duree',         texte: "J'ai besoin de trente minutes à quelques heures pour revenir" },
       { id: 'autre-apres',         texte: "Après, j'aurai besoin de repos : ne pas me demander d'expliquer" },
       { id: 'autre-prevenir',      texte: 'Prévenir la personne dont le nom est en bas de cette carte' },
-      { id: 'autre-signe',         texte: 'Rester à distance jusqu’à ce que je fasse signe' }
+      { id: 'autre-signe',         texte: "Rester à distance jusqu'à ce que je fasse signe" }
     ]
   }
 ];
@@ -1671,7 +1672,7 @@ const THEMES_MONTEE = [
     titre: 'Ce que je peux faire',
     aide: "Ce qui m'aide tant qu'il est encore temps.",
     propositions: [
-      { id: 'action-casque',    texte: 'Mettre mon casque ou mes bouchons d’oreilles' },
+      { id: 'action-casque',    texte: "Mettre mon casque ou mes bouchons d'oreilles" },
       { id: 'action-lunettes',  texte: 'Mettre mes lunettes de soleil' },
       { id: 'action-isoler',    texte: 'Aller dans un endroit calme, même cinq minutes' },
       { id: 'action-pause',     texte: "Dire que j'ai besoin d'une pause" },
@@ -1855,7 +1856,7 @@ function majResumeProtocole() {
     resume.textContent = "Coche au moins une ligne pour pouvoir créer ta carte.";
   } else {
     resume.textContent = total + (total > 1 ? ' lignes iront' : ' ligne ira')
-      + ' sur la carte. Huit à douze lignes se lisent d’un coup d’œil ; '
+      + " sur la carte. Huit à douze lignes se lisent d'un coup d'œil ; "
       + 'au-delà, le texte rapetisse.';
   }
 }
@@ -2320,8 +2321,8 @@ function fabriquerCarte() {
   const alerte = $('#carte-alerte');
   if (resultat.oubliees > 0) {
     alerte.textContent = resultat.oubliees
-      + (resultat.oubliees > 1 ? ' lignes n’ont pas pu tenir' : ' ligne n’a pas pu tenir')
-      + ' sur la carte : elles ne sont pas sur l’image. Décoches-en '
+      + (resultat.oubliees > 1 ? " lignes n'ont pas pu tenir" : " ligne n'a pas pu tenir")
+      + " sur la carte : elles ne sont pas sur l'image. Décoches-en "
       + 'quelques-unes pour que tout rentre en grand.';
     alerte.classList.remove('masque');
   } else {
@@ -2414,7 +2415,7 @@ function ouvrirEcranLiens(ouvert, depuis) {
     afficherLiens();
     ecran.focus({ preventScroll: true });
     ecran.scrollTop = 0;
-    annoncer('Ce qui m’apaise.');
+    annoncer("Ce qui m'apaise.");
   } else {
     $('#l-erreur').classList.add('masque');
     /* On revient sur le bouton d'où l'on vient — pas toujours celui de
@@ -2431,7 +2432,7 @@ async function afficherLiens() {
   conteneur.innerHTML = '';
 
   if (liste.length === 0) {
-    conteneur.innerHTML = '<p class="vide">Aucun lien pour l’instant.<br>'
+    conteneur.innerHTML = '<p class="vide">Aucun lien pour l\'instant.<br>'
       + 'Ajoute-les au calme : ils seront là le jour où chercher sera trop dur.</p>';
     return;
   }
@@ -2702,7 +2703,7 @@ function lireSauvegarde(d) {
   const etranger = "Ce fichier ne ressemble pas à une sauvegarde de Refuge.";
   if (!d || typeof d !== 'object' || Array.isArray(d)) return etranger;
   if (d.app && d.app !== 'refuge') {
-    return 'Ce fichier est une sauvegarde d’une autre application (« '
+    return "Ce fichier est une sauvegarde d'une autre application (« "
       + String(d.app) + ' ») : il ne peut pas être restauré dans Refuge.';
   }
   if (!['crises', 'protocole', 'liens', 'reglages'].some((cle) => cle in d)) return etranger;
@@ -2851,7 +2852,7 @@ $('#btn-restaurer-confirmer').addEventListener('click', async () => {
     + (r.reglages ? ', réglages rétablis' : '') + '.';
   if (reglages.aideJointPosition) {
     bilan += ' Pour joindre ta position au SMS, refais « Tester ma position » '
-      + 'au calme : l’autorisation d’Android a pu être effacée elle aussi.';
+      + "au calme : l'autorisation d'Android a pu être effacée elle aussi.";
   }
 
   /* Le plus sûr pour que chaque écran reflète les données restaurées :
