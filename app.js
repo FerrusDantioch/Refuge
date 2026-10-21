@@ -1131,11 +1131,14 @@ $('#btn-export-json').addEventListener('click', enregistrerSauvegarde);
    6. RESPIRATION GUIDÉE
    ============================================================ */
 
+/* Les descriptions disent comment se déroule chaque rythme, sans promesse
+   de santé : Refuge n'est pas un dispositif médical. Le texte de la
+   cohérence est aussi écrit dans index.html (affiché avant ce script). */
 const RYTHMES = {
   coherence: {
     nom: 'Cohérence 5-5',
-    description: "Inspirer 5 secondes, expirer 5 secondes. Le rythme de la cohérence " +
-                 "cardiaque : c'est celui qui apaise le plus vite le système nerveux.",
+    description: "Inspirer 5 secondes, expirer 5 secondes. C'est le rythme dit de " +
+                 "« cohérence cardiaque » : régulier, simple à suivre.",
     phases: [
       { texte: 'Inspire',    duree: 5, vers: 1    },
       { texte: 'Expire',     duree: 5, vers: 0.45 }
@@ -1143,8 +1146,8 @@ const RYTHMES = {
   },
   apaisant: {
     nom: 'Apaisant 4-7-8',
-    description: "Inspirer 4 secondes, retenir 7, expirer 8. L'expiration longue " +
-                 "envoie au corps un signal de sécurité. Idéal pour redescendre.",
+    description: "Inspirer 4 secondes, retenir 7, expirer 8. L'expiration est longue : " +
+                 "beaucoup de personnes la trouvent apaisante pour redescendre.",
     phases: [
       { texte: 'Inspire',    duree: 4, vers: 1    },
       { texte: 'Retiens',    duree: 7, vers: 1    },
