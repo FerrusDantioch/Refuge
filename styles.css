@@ -379,7 +379,11 @@ html[data-bouclier="on"] .choix button[aria-pressed="true"] { background: #10101
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 28px 24px calc(24px + env(safe-area-inset-bottom));
+  /* Marges gauche et droite : 24 px sur téléphone. Sur un grand écran
+     (ordinateur, tablette, vidéoprojecteur), elles grandissent pour que le
+     contenu garde la largeur des onglets (640 px), centré, au lieu de
+     s'étirer sur tout l'écran. */
+  padding: 28px max(24px, calc((100% - 640px) / 2)) calc(24px + env(safe-area-inset-bottom));
   overflow-y: auto;
 }
 .carte-sos[hidden] { display: none; }
@@ -398,6 +402,12 @@ html[data-bouclier="on"] .carte-sos .message { color: #9a9a9a; }
 .carte-sos.contraste-fort .message,
 html[data-bouclier="on"] .carte-sos.contraste-fort .message { color: #d8d8d8; }
 .carte-sos.contraste-fort { background: #101010; }
+
+/* Ce bouton n'apparaît qu'en bouclier, où le message est volontairement
+   très sombre. Ailleurs, le message est déjà bien contrasté : le bouton n'y
+   changeait presque rien en thème sombre, et noircissait l'écran en thème
+   clair (puis le rallumait d'un coup en revenant). */
+html:not([data-bouclier="on"]) #sos-contraste { display: none; }
 .carte-sos .pied { margin-top: auto; padding-top: 28px; }
 
 /* ---------- 8 bis. Numéros d'urgence ----------
