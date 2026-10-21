@@ -1185,6 +1185,7 @@ const respiration = {
     this.enCours = true;
     this.indexPhase = 0;
     $('#btn-respi').textContent = 'Arrêter';
+    majVerrouEcran();   /* l'écran reste allumé pendant la séance (section 7) */
 
     const minutes = reglages.dureeRespi;
     this.finPrevue = minutes > 0 ? Date.now() + minutes * 60000 : 0;
@@ -1247,6 +1248,7 @@ const respiration = {
 
   arreter() {
     this.enCours = false;
+    majVerrouEcran();   /* fin de séance : l'écran peut de nouveau s'éteindre */
     clearTimeout(this.minuteur);
     clearInterval(this.tictac);
     if (this.animation) {
@@ -1292,18 +1294,39 @@ document.addEventListener('visibilitychange', () => {
 
 /* ============================================================
    7. GARDER L'ÉCRAN ALLUMÉ (Wake Lock)
+   ------------------------------------------------------------
+   Deux raisons de garder l'écran allumé :
+   • la personne l'a demandé dans les Réglages ;
+   • une séance de respiration est en cours. Sans cela, Android
+     éteint l'écran après quelques dizaines de secondes sans
+     toucher (30 s sur beaucoup de Xiaomi), et la séance s'arrête
+     en plein milieu. L'écran est rendu dès la fin de la séance.
    ============================================================ */
 
 let verrouEcran = null;
 
+function ecranAGarderAllume() {
+  return reglages.ecranAllume || respiration.enCours;
+}
+
 async function majVerrouEcran() {
   try {
-    if (reglages.ecranAllume && !verrouEcran && 'wakeLock' in navigator) {
-      verrouEcran = await navigator.wakeLock.request('screen');
-      verrouEcran.addEventListener('release', () => { verrouEcran = null; });
-    } else if (!reglages.ecranAllume && verrouEcran) {
-      await verrouEcran.release();
+    if (ecranAGarderAllume() && !verrouEcran && 'wakeLock' in navigator) {
+      const verrou = await navigator.wakeLock.request('screen');
+      /* Pendant cette courte attente, la séance a pu s'arrêter, ou un
+         autre verrou a été pris : celui-ci ne sert plus, on le rend. */
+      if (verrouEcran || !ecranAGarderAllume()) { verrou.release(); return; }
+      verrouEcran = verrou;
+      verrou.addEventListener('release', () => {
+        if (verrouEcran === verrou) verrouEcran = null;
+      });
+    } else if (!ecranAGarderAllume() && verrouEcran) {
+      /* On l'oublie AVANT d'attendre qu'il soit rendu : une séance qui
+         redémarre aussitôt (changement de rythme) doit pouvoir en
+         prendre un nouveau, sans que l'ancien vienne l'effacer. */
+      const verrou = verrouEcran;
       verrouEcran = null;
+      await verrou.release();
     }
   } catch (e) {
     /* Non pris en charge ou refusé : ce n'est pas grave, on continue. */
