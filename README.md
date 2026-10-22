@@ -227,11 +227,12 @@ ou **112**. **114** par SMS pour qui ne peut pas parler.
 
 ## Licence
 
-Distribué sous licence **[MIT](LICENSE)**.
+Distribué sous licence **[PolyForm Noncommercial 1.0.0](LICENSE)** (texte
+officiel en anglais, suivi d'une traduction française à titre indicatif).
 
-Vous pouvez utiliser, modifier et redistribuer ce code librement, y compris à
-des fins commerciales, à la seule condition de conserver la mention de
-copyright et le texte de la licence. Le logiciel est fourni « en l'état »,
-sans aucune garantie.
+Vous pouvez utiliser, modifier et partager ce code librement, à condition que
+ce ne soit pas dans un but commercial et que le fichier de licence accompagne
+toujours le code. Toute utilisation commerciale nécessite l'accord de
+l'auteur. Le logiciel est fourni « en l'état », sans aucune garantie.
 
 © 2026 FerrusDantioch
