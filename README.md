@@ -225,6 +225,12 @@ ou **112**. **114** par SMS pour qui ne peut pas parler.
 
 ---
 
+## Donner ton avis
+
+Une idée, une gêne, quelque chose qui manque ? Écris à
+**omni-systeme.choking513@passmail.net** (aussi dans Réglages → À propos,
+bouton « Envoyer un retour par e-mail »).
+
 ## Licence
 
 Distribué sous licence **[PolyForm Noncommercial 1.0.0](LICENSE)** (texte
