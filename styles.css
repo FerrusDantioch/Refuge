@@ -234,6 +234,17 @@ button, .bouton {
 
 button:active { background: var(--bord); }
 
+/* Un lien qui a l'allure d'un bouton (ex. « Envoyer un retour par e-mail »). */
+a.bouton {
+  display: block;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+/* Une adresse e-mail est un long mot sans espace : on autorise la coupure
+   pour qu'elle ne déborde pas de l'écran sur un petit téléphone. */
+.adresse-mail { display: block; overflow-wrap: anywhere; }
+
 .bouton-doux {
   background: var(--accent-fond);
   border-color: var(--accent);
