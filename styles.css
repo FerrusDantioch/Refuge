@@ -245,6 +245,20 @@ a.bouton {
    pour qu'elle ne déborde pas de l'écran sur un petit téléphone. */
 .adresse-mail { display: block; overflow-wrap: anywhere; }
 
+/* Lien vers la licence (À propos) : couleur du texte autour, simplement
+   souligné (le bleu du navigateur serait trop vif). La hauteur minimale
+   garde une zone tactile de 60 px. */
+.lien-licence {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 60px;
+}
+/* En bouclier, la mention disparaît : aucun lien vers internet. */
+html[data-bouclier="on"] .mention-licence { display: none; }
+
 .bouton-doux {
   background: var(--accent-fond);
   border-color: var(--accent);
