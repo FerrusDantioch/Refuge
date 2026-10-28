@@ -105,11 +105,15 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   la personne touche « Mettre à jour », bouton placé **dans les Réglages
   seulement** (`#carte-mise-a-jour`) : l'accueil sert en crise, il ne porte
   qu'une note sans bouton (`#avis-mise-a-jour`), et les deux disparaissent
-  en bouclier. Ne pas remettre `self.skipWaiting()` dans l'installation de
-  `sw.js` (il n'est appelé qu'au message `{ type: 'activer' }`), et ne
-  jamais remplacer en arrière-plan un fichier rangé dans le cache. Limite du
-  navigateur, dite sur la carte : si Refuge est complètement fermée, la
-  nouvelle version est là à l'ouverture suivante.
+  en bouclier. Cela tient **même si Refuge est fermée puis rouverte** :
+  `sw.js` note la copie EN SERVICE dans le cache `refuge-choix`, et le
+  `fetch` ne sert qu'elle ; un service worker plus récent, activé par le
+  navigateur à la réouverture, continue donc de servir l'ancienne. Messages
+  page ↔ service worker, **noms à ne jamais changer** (une ancienne page doit
+  pouvoir parler à un service worker plus récent) : `etat` (réponse
+  `{ nouvelleVersion }`), `activer`, `recharger`. Pas de `self.skipWaiting()`
+  dans l'installation, et ne jamais remplacer en arrière-plan un fichier
+  rangé dans le cache.
 
 ## ⚠️ Avant de pousser : incrémenter la version du service worker
 
