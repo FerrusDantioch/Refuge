@@ -2912,6 +2912,11 @@ async function demarrer() {
        recharge que si la personne a touché « Mettre à jour ». */
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (miseAJourDemandee) location.reload();
+      else demanderEtat();
+    });
+    /* Le service worker déjà actif a mis la nouvelle version en service. */
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'recharger') location.reload();
     });
     navigator.serviceWorker.register('./sw.js')
       .then(surveillerMisesAJour)
@@ -2922,17 +2927,36 @@ async function demarrer() {
 }
 
 /* Nouvelle version de Refuge : le service worker la télécharge en
-   arrière-plan, puis ATTEND. Rien ne change par surprise : une note
-   discrète sur l'accueil, et le bouton « Mettre à jour » dans les Réglages.
-   C'est la personne qui choisit le moment. */
+   arrière-plan, puis ATTEND, même si Refuge est fermée puis rouverte (voir
+   sw.js). Rien ne change par surprise : une note discrète sur l'accueil, et
+   le bouton « Mettre à jour » dans les Réglages. C'est la personne qui
+   choisit le moment.
+   Une nouvelle version peut attendre de deux façons :
+   - son service worker attend (inscriptionSw.waiting) ;
+   - ou il est déjà actif (Refuge a été fermée puis rouverte) mais sert
+     encore l'ancienne copie : il le dit quand on lui demande son « etat ». */
 let inscriptionSw = null;
 let miseAJourDemandee = false;
+let versionEnAttente = false;   // réponse du service worker à « etat »
+
+/* Demande au service worker en place si une nouvelle version attend. */
+function demanderEtat() {
+  const sw = navigator.serviceWorker.controller;
+  if (!sw) return;
+  const canal = new MessageChannel();
+  canal.port1.onmessage = (e) => {
+    versionEnAttente = !!(e.data && e.data.nouvelleVersion);
+    majMiseAJour();
+  };
+  sw.postMessage({ type: 'etat' }, [canal.port2]);
+}
 
 function surveillerMisesAJour(inscription) {
   inscriptionSw = inscription;
   /* Une version attendait déjà (téléchargée lors d'une visite précédente).
      Sans « controller », c'est la toute première installation. */
   majMiseAJour();
+  demanderEtat();
   inscription.addEventListener('updatefound', () => {
     const nouveau = inscription.installing;
     if (!nouveau) return;
@@ -2947,17 +2971,20 @@ function surveillerMisesAJour(inscription) {
 }
 
 function majMiseAJour() {
-  const prete = !!(inscriptionSw && inscriptionSw.waiting && navigator.serviceWorker.controller);
+  const enAttente = !!(inscriptionSw && inscriptionSw.waiting) || versionEnAttente;
+  const prete = enAttente && !!navigator.serviceWorker.controller;
   $('#avis-mise-a-jour').classList.toggle('masque', !prete);
   $('#carte-mise-a-jour').classList.toggle('masque', !prete);
 }
 
 $('#btn-mise-a-jour').addEventListener('click', (e) => {
-  if (!inscriptionSw || !inscriptionSw.waiting) return;
+  /* Le service worker qui attend, sinon celui qui est déjà actif. */
+  const sw = (inscriptionSw && inscriptionSw.waiting) || navigator.serviceWorker.controller;
+  if (!sw) return;
   miseAJourDemandee = true;
   e.currentTarget.disabled = true;
   e.currentTarget.textContent = 'Mise à jour…';
-  inscriptionSw.waiting.postMessage({ type: 'activer' });
+  sw.postMessage({ type: 'activer' });
 });
 
 /* Stockage persistant : par défaut, le navigateur peut effacer de lui-même
