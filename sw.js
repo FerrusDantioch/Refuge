@@ -3,7 +3,7 @@
    En crise, on ne peut pas dépendre du réseau : tout est mis en cache
    la première fois, puis servi depuis le téléphone. */
 
-const CACHE = 'refuge-v24';
+const CACHE = 'refuge-v25';
 
 /* La liste des fichiers indispensables au fonctionnement hors-ligne. */
 const FICHIERS = [
@@ -20,12 +20,16 @@ const FICHIERS = [
 /* 1. Installation : on télécharge et on range tout dans le cache.
       cache: 'reload' va chercher les fichiers sur le serveur, jamais dans
       la mémoire temporaire du navigateur : GitHub Pages la garde dix
-      minutes, et la nouvelle version aurait pu ranger d'anciens fichiers. */
+      minutes, et la nouvelle version aurait pu ranger d'anciens fichiers.
+      Volontairement, PAS de self.skipWaiting() ici : une nouvelle version
+      attend que la personne touche « Mettre à jour » dans les Réglages
+      (voir l'étape 3). Rien ne change par surprise. Seule exception, fixée
+      par le navigateur : si Refuge est complètement fermée, la nouvelle
+      version est là à la prochaine ouverture. */
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
       .then((c) => c.addAll(FICHIERS.map((f) => new Request(f, { cache: 'reload' }))))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -46,25 +50,31 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-/* 3. Interception des requêtes : on sert d'abord le cache (instantané, hors-ligne),
-      et on rafraîchit discrètement en arrière-plan si le réseau répond.
+/* 3. La personne a touché « Mettre à jour » : cette version prend le relais.
+      La page le remarque (événement « controllerchange ») et se recharge. */
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'activer') self.skipWaiting();
+});
+
+/* 4. Interception des requêtes : on sert la copie rangée dans le téléphone
+      (instantané, hors-ligne). On ne va sur internet que pour un fichier
+      absent de la copie.
+      On ne remplace JAMAIS en arrière-plan un fichier déjà rangé : sinon
+      l'application changerait en douce, sans passer par « Mettre à jour ».
+      On ne cherche que dans CACHE, la copie de CETTE version : pendant
+      qu'une nouvelle version attend, sa copie existe déjà à côté.
       ignoreSearch : les raccourcis de l'icône ouvrent « index.html?mode=bouclier »
       ou « ?vue=respiration ». Sans cette option, ces adresses ne correspondaient
       à rien dans le cache, et le raccourci « Bouclier » échouait hors-ligne. */
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then((enCache) => {
-      const surLeReseau = fetch(e.request)
-        .then((rep) => {
-          if (rep && rep.status === 200 && rep.type === 'basic') {
-            const copie = rep.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copie));
-          }
-          return rep;
-        })
-        .catch(() => enCache);
-      return enCache || surLeReseau;
-    })
+    caches.open(CACHE).then((c) => c.match(e.request, { ignoreSearch: true }).then((enCache) => {
+      if (enCache) return enCache;
+      return fetch(e.request).then((rep) => {
+        if (rep && rep.status === 200 && rep.type === 'basic') c.put(e.request, rep.clone());
+        return rep;
+      });
+    }))
   );
 });

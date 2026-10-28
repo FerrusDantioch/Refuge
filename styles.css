@@ -538,6 +538,10 @@ html[data-bouclier="on"] .cercle {
 }
 html[data-bouclier="on"] .avis { background: #0a0a0a; border-color: var(--bord); }
 
+/* « Nouvelle version prête » (accueil et Réglages) : rien en bouclier,
+   le bouclier, c'est le silence, pas une proposition de plus. */
+html[data-bouclier="on"] .nouvelle-version { display: none !important; }
+
 /* Ligne de transparence de la carte SOS : ce qui partira avec le SMS.
    Quand le bouton de retrait est masqué, le texte ne doit pas laisser
    un blanc en bas de l'encadré. */
