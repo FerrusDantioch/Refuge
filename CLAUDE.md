@@ -101,6 +101,16 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   (`preventScroll`) et non au bouton « Fermer », sinon la liste s'ouvre par la
   fin.
 
+- **Nouvelle version : jamais de changement par surprise.** Elle attend que
+  la personne touche « Mettre à jour », bouton placé **dans les Réglages
+  seulement** (`#carte-mise-a-jour`) : l'accueil sert en crise, il ne porte
+  qu'une note sans bouton (`#avis-mise-a-jour`), et les deux disparaissent
+  en bouclier. Ne pas remettre `self.skipWaiting()` dans l'installation de
+  `sw.js` (il n'est appelé qu'au message `{ type: 'activer' }`), et ne
+  jamais remplacer en arrière-plan un fichier rangé dans le cache. Limite du
+  navigateur, dite sur la carte : si Refuge est complètement fermée, la
+  nouvelle version est là à l'ouverture suivante.
+
 ## ⚠️ Avant de pousser : incrémenter la version du service worker
 
 Après toute modification d'un fichier **mis en cache** (`index.html`, `app.js`,

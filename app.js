@@ -2908,12 +2908,57 @@ async function demarrer() {
   /* Installation du service worker : c'est lui qui rend l'application
      utilisable sans connexion. */
   if ('serviceWorker' in navigator) {
+    /* Ce changement a aussi lieu à la toute première installation : on ne
+       recharge que si la personne a touché « Mettre à jour ». */
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (miseAJourDemandee) location.reload();
+    });
     navigator.serviceWorker.register('./sw.js')
+      .then(surveillerMisesAJour)
       .catch((e) => console.warn('Mode hors-ligne indisponible.', e));
   }
 
   demanderStockagePersistant();
 }
+
+/* Nouvelle version de Refuge : le service worker la télécharge en
+   arrière-plan, puis ATTEND. Rien ne change par surprise : une note
+   discrète sur l'accueil, et le bouton « Mettre à jour » dans les Réglages.
+   C'est la personne qui choisit le moment. */
+let inscriptionSw = null;
+let miseAJourDemandee = false;
+
+function surveillerMisesAJour(inscription) {
+  inscriptionSw = inscription;
+  /* Une version attendait déjà (téléchargée lors d'une visite précédente).
+     Sans « controller », c'est la toute première installation. */
+  majMiseAJour();
+  inscription.addEventListener('updatefound', () => {
+    const nouveau = inscription.installing;
+    if (!nouveau) return;
+    nouveau.addEventListener('statechange', () => {
+      if (nouveau.state === 'installed') majMiseAJour();
+    });
+  });
+  /* À chaque retour dans Refuge, on regarde s'il existe une nouvelle version. */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') inscription.update().catch(() => {});
+  });
+}
+
+function majMiseAJour() {
+  const prete = !!(inscriptionSw && inscriptionSw.waiting && navigator.serviceWorker.controller);
+  $('#avis-mise-a-jour').classList.toggle('masque', !prete);
+  $('#carte-mise-a-jour').classList.toggle('masque', !prete);
+}
+
+$('#btn-mise-a-jour').addEventListener('click', (e) => {
+  if (!inscriptionSw || !inscriptionSw.waiting) return;
+  miseAJourDemandee = true;
+  e.currentTarget.disabled = true;
+  e.currentTarget.textContent = 'Mise à jour…';
+  inscriptionSw.waiting.postMessage({ type: 'activer' });
+});
 
 /* Stockage persistant : par défaut, le navigateur peut effacer de lui-même
    la copie hors-ligne (et le journal, les réglages) s'il manque de place ou

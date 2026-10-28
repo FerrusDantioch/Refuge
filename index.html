@@ -103,6 +103,16 @@
       Ouvre l'onglet <strong>Réglages</strong> pour en ajouter un, à tête reposée.
     </p>
 
+    <!-- Nouvelle version prête : une simple information, SANS bouton ici.
+         L'accueil sert en crise : un appui de travers ne doit rien
+         recharger. La mise à jour se fait depuis les Réglages, au calme.
+         Disparaît en bouclier (.nouvelle-version dans styles.css). -->
+    <p id="avis-mise-a-jour" class="avis nouvelle-version masque">
+      Une nouvelle version de Refuge est prête. Rien ne change sans toi :
+      tu pourras l'installer depuis l'onglet <strong>Réglages</strong>,
+      quand tu seras au calme.
+    </p>
+
   </section>
 
   <!-- ========================================================
@@ -305,6 +315,18 @@
        ======================================================== -->
   <section id="vue-reglages" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-reglages" hidden>
     <h1>Réglages</h1>
+
+    <!-- Nouvelle version prête : rien ne change tant que la personne n'a
+         pas touché « Mettre à jour ». Masquée sinon, et en bouclier. -->
+    <div id="carte-mise-a-jour" class="carte nouvelle-version masque">
+      <h2>Nouvelle version de Refuge</h2>
+      <p>Une nouvelle version est prête. Tu choisis le moment de
+         l'installer : ton journal, ton protocole et tes réglages restent
+         tels quels.</p>
+      <p><small>Si tu fermes complètement Refuge, la nouvelle version sera
+         là à la prochaine ouverture.</small></p>
+      <button type="button" id="btn-mise-a-jour" class="bouton-doux">Mettre à jour</button>
+    </div>
 
     <div class="carte">
       <h2>Contact d'urgence</h2>
