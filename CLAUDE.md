@@ -93,6 +93,17 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   « Quand ça monte ») ; les smileys y passent en gris. Noms sans accord
   (« Colère », « Épuisement ») ; étapes à l'infinitif ou à la première
   personne, jamais une consigne médicale.
+- **« Écrire à un proche » : un contact, un message, un lien `sms:`.**
+  Contacts saisis à la main (pas de Contact Picker : il ne marche pas sur
+  tous les téléphones), rangés dans `reglages.contacts` (section 11 bis
+  d'`app.js`), donc dans la sauvegarde JSON. Un appui sur un message ouvre
+  Messages, numéro et texte remplis ; **jamais d'envoi automatique, jamais
+  d'envoi groupé** (un seul destinataire par lien), et jamais de position
+  jointe : seul le SMS d'urgence du bouton d'aide la propose, et il reste
+  tel quel. Une sauvegarde sans `contacts` ne les efface pas à la
+  restauration. `REGLAGES_DEFAUT.contacts` ne doit jamais être modifié :
+  `chargerReglages()` en fabrique une copie neuve. Reste visible en
+  bouclier : écrire sans parler y est justement utile.
 - **Phrases courtes à montrer : seulement pour « Montrer un message ».**
   Elles s'affichent en grand et ne déclenchent jamais rien (ni SMS, ni
   appel). Absentes de la carte « J'ai besoin d'aide ». Elles parlent aux

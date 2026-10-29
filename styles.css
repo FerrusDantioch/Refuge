@@ -765,8 +765,8 @@ html[data-bouclier="on"] .smiley-petit { filter: grayscale(1) brightness(0.6); }
 
 /* Réglages : une émotion par encadré dépliable. Le titre fait au
    moins 60 px de haut pour se toucher facilement. */
-.emotion-reglage { border: 1px solid var(--bord); border-radius: 14px; margin-bottom: 12px; }
-.emotion-reglage > summary {
+:is(.emotion-reglage, .proche-reglage) { border: 1px solid var(--bord); border-radius: 14px; margin-bottom: 12px; }
+:is(.emotion-reglage, .proche-reglage) > summary {
   min-height: 60px;
   display: flex;
   align-items: center;
@@ -775,9 +775,9 @@ html[data-bouclier="on"] .smiley-petit { filter: grayscale(1) brightness(0.6); }
   cursor: pointer;
   font-weight: 600;
 }
-.emotion-reglage[open] > summary { border-bottom: 1px solid var(--bord); }
-.emotion-reglage .dedans { padding: 14px 12px 6px; }
-.emotion-reglage summary small { font-weight: 400; margin-left: auto; }
+:is(.emotion-reglage, .proche-reglage)[open] > summary { border-bottom: 1px solid var(--bord); }
+:is(.emotion-reglage, .proche-reglage) .dedans { padding: 14px 12px 6px; }
+:is(.emotion-reglage, .proche-reglage) summary small { font-weight: 400; margin-left: auto; }
 .choix-smiley { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .choix-smiley button { padding: 6px; font-size: 1.6rem; line-height: 1; }
 .choix-smiley button[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-fond); }
@@ -796,4 +796,19 @@ html[data-bouclier="on"] .smiley-petit { filter: grayscale(1) brightness(0.6); }
 }
 /* Un bouton qui ne peut pas servir (« Monter » sur la première étape) :
    estompé, mais toujours lisible. */
-.emotion-reglage button:disabled { opacity: 0.45; cursor: default; }
+:is(.emotion-reglage, .proche-reglage) button:disabled { opacity: 0.45; cursor: default; }
+
+/* ============================================================
+   16. ÉCRIRE À UN PROCHE
+   Un bouton par contact, puis un bouton par message. Le message
+   s'affiche en entier, aligné à gauche, pour être relu avant
+   l'appui. Les encadrés des Réglages reprennent ceux des émotions.
+   ============================================================ */
+.liste-boutons { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.liste-boutons button { min-height: 72px; overflow-wrap: anywhere; }
+.liste-boutons .bouton-contact { font-size: 1.15rem; font-weight: 600; }
+.liste-boutons .bouton-contact small { display: block; font-weight: 400; margin-top: 2px; }
+.liste-boutons .bouton-message { text-align: left; white-space: pre-line; line-height: 1.45; }
+.message-reglage { border-top: 1px solid var(--bord); padding: 12px 0; }
+.message-reglage textarea { min-height: 84px; margin-bottom: 8px; }
+.message-reglage button { width: auto; padding: 10px 16px; font-size: 0.9rem; }
