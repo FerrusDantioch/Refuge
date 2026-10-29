@@ -86,7 +86,8 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   protocole, tout y est modifiable par la personne (nom, smiley, étapes) ;
   les `id` d'émotions et d'étapes retiennent les cases cochées et ne
   changent pas. Les cases cochées pendant la crise sont à part
-  (`refuge.emotionsCoches`, localStorage, effacées après 6 h) et hors
+  (`refuge.emotionsCoches`, localStorage, gardées pour la journée en
+  cours sauf décochage, remises à zéro le lendemain) et hors
   sauvegarde. Une sauvegarde sans `emotions` ne les efface pas à la
   restauration. **Reste visible et lisible en bouclier** (contrairement à
   « Quand ça monte ») ; les smileys y passent en gris. Noms sans accord

@@ -23,7 +23,8 @@ sur le téléphone.
 Sur l'accueil, « Ce que je ressens » montre cinq émotions en gros smileys :
 Anxiété, Surcharge, Colère, Tristesse, Épuisement. Un appui affiche les étapes
 prévues pour cette émotion, à cocher au fur et à mesure pendant la crise.
-Les cases cochées s'effacent toutes seules après 6 heures.
+Les cases cochées restent cochées toute la journée, sauf si on les décoche,
+et repartent à zéro le lendemain.
 
 Tout se prépare au calme dans les **Réglages** : nom, smiley, et étapes
 (ajouter, modifier, supprimer, monter, descendre). Des exemples sont fournis

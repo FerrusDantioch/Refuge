@@ -2651,8 +2651,9 @@ function initProtocole() {
    Les cases cochées pendant une crise ne sont PAS dans le protocole :
    elles ne servent que le temps de la crise. Elles sont gardées à part
    (localStorage), pour survivre si le téléphone ferme Refuge pendant
-   qu'on envoie un SMS, et s'effacent toutes seules après 6 heures sans
-   changement. Elles ne partent pas dans la sauvegarde.
+   qu'on envoie un SMS. Elles restent cochées toute la journée en cours,
+   sauf si la personne les décoche, et repartent à zéro le lendemain
+   (minuit, heure du téléphone). Elles ne partent pas dans la sauvegarde.
    ============================================================ */
 
 const MAX_EMOTIONS = 10;
@@ -2730,20 +2731,22 @@ function deuxAppuis(bouton, texteConfirmer, action) {
 /* --- Les cases cochées pendant la crise --- */
 
 const CLE_COCHES_EMOTIONS = 'refuge.emotionsCoches';
-const DUREE_COCHES_MS = 6 * 60 * 60 * 1000;
 
-/* { idEmotion: [idEtape, …] }, ou {} si rien, ou si trop ancien. */
+/* La date du jour sur le téléphone, par exemple « 2026-10-29 ». */
+const aujourdhui = () => maintenantLocal().slice(0, 10);
+
+/* { idEmotion: [idEtape, …] }, ou {} si rien, ou si c'était un autre jour. */
 function lireCochesEmotions() {
   try {
     const d = JSON.parse(localStorage.getItem(CLE_COCHES_EMOTIONS));
-    if (d && d.coches && typeof d.coches === 'object' && Date.now() - d.ts < DUREE_COCHES_MS) return d.coches;
+    if (d && d.coches && typeof d.coches === 'object' && d.jour === aujourdhui()) return d.coches;
   } catch (e) { /* rien */ }
   return {};
 }
 
 function ecrireCochesEmotions(coches) {
   try {
-    localStorage.setItem(CLE_COCHES_EMOTIONS, JSON.stringify({ ts: Date.now(), coches: coches }));
+    localStorage.setItem(CLE_COCHES_EMOTIONS, JSON.stringify({ jour: aujourdhui(), coches: coches }));
   } catch (e) { /* rien : les cases restent cochées à l'écran */ }
 }
 
