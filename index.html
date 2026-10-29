@@ -57,6 +57,11 @@
       </button>
     </div>
 
+    <!-- Messages préparés pour mes proches. N'apparaît que si au moins un
+         contact a un numéro (Réglages). Reste là en bouclier : écrire à
+         quelqu'un sans parler est justement utile à ce moment-là. -->
+    <button id="btn-proches" class="masque" style="margin-bottom:16px">Écrire à un proche</button>
+
     <button id="btn-respirer-vite" style="margin-bottom:16px">Respirer avec moi</button>
 
     <!-- Procédures par émotion : préparées au calme dans les Réglages.
@@ -382,6 +387,29 @@
       <button type="button" id="btn-defaut-message">Remettre les textes d'origine</button>
     </div>
 
+    <!-- Mes proches : les encadrés sont construits par app.js (section
+         11 bis) à partir de reglages.contacts. -->
+    <div class="carte">
+      <h2>Mes proches et leurs messages</h2>
+      <p><small>Sur l'accueil, « Écrire à un proche » montre ces contacts.
+         Pour chacun, prépare un ou plusieurs messages. Un appui ouvrira
+         Messages avec le texte déjà écrit ; c'est toi qui choisiras
+         d'envoyer.</small></p>
+      <p><small>Le SMS du bouton d'aide (contact d'urgence, ci-dessus) ne
+         change pas, avec ta position si tu l'as activée. Ces messages-ci
+         partent sans position.</small></p>
+      <div id="r-proches"></div>
+
+      <h3 style="margin-top:18px">Ajouter un contact</h3>
+      <label for="r-proche-nom">Son nom</label>
+      <input type="text" id="r-proche-nom" maxlength="40" placeholder="Par exemple : Sam">
+      <label for="r-proche-tel">Son numéro</label>
+      <input type="tel" id="r-proche-tel" maxlength="30" placeholder="06 12 34 56 78">
+      <p id="r-proche-erreur" class="avis masque" role="status"></p>
+      <button type="button" id="r-proche-ajouter" class="bouton-doux" style="margin-bottom:12px">Ajouter ce contact</button>
+      <button type="button" id="r-proche-reprendre">Reprendre mon contact d'urgence</button>
+    </div>
+
     <div class="carte">
       <h2>Phrases courtes à montrer</h2>
       <label for="r-phrases">Une phrase par ligne</label>
@@ -523,7 +551,8 @@
          données de Chrome ou du navigateur, réinstallation, changement de
          téléphone), tout ce que tu as saisi disparaît. Un fichier de
          sauvegarde, rangé dans le téléphone, permet de tout retrouver.</small></p>
-      <p><small>Il contient ton journal, tes liens, tes réglages et tout
+      <p><small>Il contient ton journal, tes liens, tes réglages (avec tes
+         proches et leurs messages) et tout
          ton protocole : les cases cochées, tes propres lignes, la personne
          à prévenir, le fond choisi pour la carte et tes procédures par
          émotion. Il contient donc aussi
@@ -887,6 +916,37 @@
 
   <div class="pied">
     <button type="button" id="emotions-fermer">Fermer</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     ÉCRAN PLEIN : ÉCRIRE À UN PROCHE
+     D'abord un bouton par contact, puis un bouton par message. Un appui
+     sur un message ouvre Messages, texte déjà écrit ; l'envoi reste
+     toujours un geste de la personne. Jamais d'envoi groupé.
+     ============================================================ -->
+<div id="ecran-proches" class="carte-sos defile lisible-en-bouclier" hidden tabindex="-1"
+     role="dialog" aria-modal="true" aria-labelledby="proches-titre">
+
+  <div id="proches-choix">
+    <h2 id="proches-titre">Écrire à un proche</h2>
+    <p class="intro">À qui veux-tu écrire ?</p>
+    <div id="proches-contacts" class="liste-boutons"></div>
+  </div>
+
+  <div id="proches-etape-message" hidden>
+    <h2 id="proches-nom"></h2>
+    <p class="intro" id="proches-numero"></p>
+    <p class="avis">Un appui sur un message ouvre Messages avec le texte
+       déjà écrit : rien ne part tant que tu n'as pas touché « Envoyer ».</p>
+    <div id="proches-messages" class="liste-boutons"></div>
+    <p id="proches-aucun" class="intro masque">Aucun message préparé pour ce
+       contact. Tu pourras en ajouter au calme, dans les Réglages.</p>
+    <button type="button" id="proches-retour" class="bouton-doux" style="margin-top:4px">Choisir un autre contact</button>
+  </div>
+
+  <div class="pied">
+    <button type="button" id="proches-fermer">Fermer</button>
   </div>
 </div>
 

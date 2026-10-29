@@ -71,7 +71,11 @@ const REGLAGES_DEFAUT = {
   dureeRespi: 3,
   palette: 'refuge',
   phrases: PHRASES_DEFAUT,
-  declencheursPerso: ''      /* un par ligne, comme les phrases */
+  declencheursPerso: '',     /* un par ligne, comme les phrases */
+  /* Mes proches et leurs messages préparés (section 11 bis) :
+     [{ id, nom, tel, messages: [{ id, texte }] }]. Ne jamais modifier ce
+     tableau-ci : chargerReglages() en fabrique toujours une copie. */
+  contacts: []
 };
 
 let reglages = { ...REGLAGES_DEFAUT };
@@ -85,6 +89,8 @@ function chargerReglages() {
        l'application doit toujours démarrer, quoi qu'il arrive. */
     console.warn('Réglages illisibles, valeurs par défaut utilisées.', e);
   }
+  /* Une liste neuve, vérifiée : jamais celle de REGLAGES_DEFAUT. */
+  reglages.contacts = nettoyerContacts(reglages.contacts) || [];
 }
 
 function sauverReglages() {
@@ -3592,6 +3598,373 @@ $$('.entree-liens').forEach((b) => {
 $('#liens-fermer').addEventListener('click', () => ouvrirEcranLiens(false));
 
 /* ============================================================
+   11 bis. ÉCRIRE À UN PROCHE — contacts et messages préparés
+   ------------------------------------------------------------
+   Une liste de contacts saisis à la main (le sélecteur de contacts du
+   téléphone ne marche pas partout), chacun avec un ou plusieurs
+   messages préparés au calme. Rangée dans les réglages
+   (reglages.contacts) : elle part donc dans la sauvegarde JSON.
+
+   Les règles, les mêmes que pour le bouton d'aide :
+     • Refuge n'envoie JAMAIS rien. Un appui sur un message ouvre
+       Messages avec le numéro et le texte déjà remplis ; le dernier
+       geste, « Envoyer », reste celui de la personne ;
+     • un bouton par contact, un lien par message : jamais d'envoi
+       groupé à plusieurs personnes ;
+     • le SMS d'urgence du bouton d'aide n'est pas touché, et ces
+       messages-ci ne joignent jamais la position.
+   ============================================================ */
+
+const MAX_CONTACTS = 20;
+const MAX_MESSAGES = 10;
+
+/* Les deux messages proposés pour un nouveau contact, modifiables. */
+const MESSAGES_PROCHE_DEFAUT = [
+  "J'ai besoin de calme, ne m'appelle pas. Je te recontacte quand ça ira mieux.",
+  'Viens me chercher, s\'il te plaît.'
+];
+
+/* Vérifie la liste qui vient du téléphone ou d'un fichier de sauvegarde.
+   null si elle est absente ou inutilisable. */
+function nettoyerContacts(liste) {
+  if (!Array.isArray(liste)) return null;
+  const idsVus = new Set();
+  const unique = (id) => {
+    const propre = typeof id === 'string' && id ? id.slice(0, 60) : nouvelId();
+    const final = idsVus.has(propre) ? nouvelId() : propre;
+    idsVus.add(final);
+    return final;
+  };
+  return liste
+    .filter((c) => c && typeof c === 'object')
+    .slice(0, MAX_CONTACTS)
+    .map((c) => ({
+      id: unique(c.id),
+      nom: typeof c.nom === 'string' ? couper(c.nom, 40) : '',
+      tel: typeof c.tel === 'string' ? couper(c.tel, 30) : '',
+      messages: (Array.isArray(c.messages) ? c.messages : [])
+        .filter((m) => m && typeof m === 'object' && typeof m.texte === 'string')
+        .slice(0, MAX_MESSAGES)
+        .map((m) => ({ id: unique(m.id), texte: couper(m.texte, 500) }))
+    }));
+}
+
+const nomContact = (c) => (c.nom || '').trim() || 'Sans nom';
+/* Un contact sans aucun chiffre dans son numéro ne peut pas recevoir de
+   SMS : il n'apparaît pas sur l'accueil. */
+const contactJoignable = (c) => /\d/.test(c.tel || '');
+const messagesRemplis = (c) => c.messages.filter((m) => m.texte.trim());
+
+/* Ouvre Messages avec UN destinataire et le texte déjà écrit. La même
+   forme de lien que le SMS d'urgence (ouvrirSms) : celle qu'Android
+   comprend. Rien n'est envoyé : la personne touche « Envoyer » elle-même. */
+function ouvrirMessages(tel, texte) {
+  window.location.href = 'sms:' + numeroPropre(tel) + '?body=' + encodeURIComponent(texte);
+}
+
+/* Le bouton de l'accueil n'existe que s'il y a quelqu'un à qui écrire. */
+function majBoutonProches() {
+  $('#btn-proches').classList.toggle('masque', !reglages.contacts.some(contactJoignable));
+}
+
+/* --- L'écran plein --- */
+
+function ouvrirEcranProches(ouvert) {
+  const ecran = $('#ecran-proches');
+  ecran.hidden = !ouvert;
+  if (!ouvert) {
+    if ($('#btn-proches').offsetParent) $('#btn-proches').focus();
+    return;
+  }
+  montrerContactsProches();
+  ecran.focus({ preventScroll: true });
+  annoncer('Écrire à un proche.');
+}
+
+/* Premier temps : un bouton par contact. */
+function montrerContactsProches() {
+  const zone = $('#proches-contacts');
+  zone.innerHTML = '';
+  reglages.contacts.filter(contactJoignable).forEach((contact) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bouton-contact';
+    b.textContent = nomContact(contact);
+    const numero = document.createElement('small');
+    numero.textContent = contact.tel;
+    b.appendChild(numero);
+    b.addEventListener('click', () => montrerMessagesProche(contact.id));
+    zone.appendChild(b);
+  });
+  $('#proches-choix').hidden = false;
+  $('#proches-etape-message').hidden = true;
+  const ecran = $('#ecran-proches');
+  ecran.setAttribute('aria-labelledby', 'proches-titre');
+  ecran.scrollTop = 0;
+}
+
+/* Second temps : un bouton par message. Un appui ouvre Messages. */
+function montrerMessagesProche(id) {
+  const contact = reglages.contacts.find((c) => c.id === id);
+  if (!contact) { montrerContactsProches(); return; }
+  $('#proches-nom').textContent = 'À ' + nomContact(contact);
+  $('#proches-numero').textContent = contact.tel;
+
+  const messages = messagesRemplis(contact);
+  const zone = $('#proches-messages');
+  zone.innerHTML = '';
+  messages.forEach((m) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bouton-message';
+    b.textContent = m.texte;
+    b.addEventListener('click', () => ouvrirMessages(contact.tel, m.texte.trim()));
+    zone.appendChild(b);
+  });
+  $('#proches-aucun').classList.toggle('masque', messages.length > 0);
+
+  $('#proches-choix').hidden = true;
+  $('#proches-etape-message').hidden = false;
+  const ecran = $('#ecran-proches');
+  ecran.setAttribute('aria-labelledby', 'proches-nom');
+  ecran.scrollTop = 0;
+  ecran.focus({ preventScroll: true });
+  annoncer('Écrire à ' + nomContact(contact) + '. Choisis un message.');
+}
+
+$('#btn-proches').addEventListener('click', () => ouvrirEcranProches(true));
+$('#proches-fermer').addEventListener('click', () => ouvrirEcranProches(false));
+$('#proches-retour').addEventListener('click', () => {
+  montrerContactsProches();
+  $('#ecran-proches').focus({ preventScroll: true });
+  annoncer('Choisis un contact.');
+});
+
+/* --- Les Réglages : un encadré dépliable par contact --- */
+
+function construireReglagesProches() {
+  const zone = $('#r-proches');
+  const ouverts = new Set($$('#r-proches details[open]').map((d) => d.dataset.id));
+  zone.innerHTML = '';
+  if (!reglages.contacts.length) {
+    const vide = document.createElement('p');
+    vide.innerHTML = "<small>Aucun contact pour l'instant.</small>";
+    zone.appendChild(vide);
+  }
+  reglages.contacts.forEach((contact) => {
+    zone.appendChild(carteReglageProche(contact, ouverts.has(contact.id)));
+  });
+  majBoutonProches();
+}
+
+function carteReglageProche(contact, ouvert) {
+  const details = document.createElement('details');
+  details.className = 'proche-reglage';
+  details.dataset.id = contact.id;
+  details.open = ouvert;
+
+  const resume = document.createElement('summary');
+  const majResume = () => {
+    resume.innerHTML = '';
+    const nom = document.createElement('span');
+    nom.textContent = nomContact(contact);
+    const total = messagesRemplis(contact).length;
+    const compte = document.createElement('small');
+    compte.textContent = total + (total > 1 ? ' messages' : ' message');
+    resume.append(nom, compte);
+  };
+  majResume();
+  details.appendChild(resume);
+
+  const dedans = document.createElement('div');
+  dedans.className = 'dedans';
+  details.appendChild(dedans);
+  const base = 'proche-' + contact.id;
+
+  /* Nom et numéro */
+  const champ = (cle, etiquetteTexte, type, max) => {
+    const etiquette = document.createElement('label');
+    etiquette.setAttribute('for', base + '-' + cle);
+    etiquette.textContent = etiquetteTexte;
+    const c = document.createElement('input');
+    c.type = type;
+    c.id = base + '-' + cle;
+    c.maxLength = max;
+    c.value = contact[cle];
+    dedans.append(etiquette, c);
+    return c;
+  };
+  const champNom = champ('nom', 'Son nom', 'text', 40);
+  const champTel = champ('tel', 'Son numéro', 'tel', 30);
+  champTel.autocomplete = 'off';
+  const avisTel = document.createElement('p');
+  avisTel.className = 'avis masque';
+  avisTel.textContent = "Ce numéro ne contient aucun chiffre : ce contact n'apparaîtra pas sur l'accueil.";
+  dedans.appendChild(avisTel);
+  const majAvisTel = () => avisTel.classList.toggle('masque', contactJoignable(contact));
+  majAvisTel();
+
+  champNom.addEventListener('input', () => {
+    contact.nom = champNom.value;
+    sauverReglages();
+    majResume();
+  });
+  champTel.addEventListener('input', () => {
+    contact.tel = champTel.value;
+    sauverReglages();
+    majAvisTel();
+    majBoutonProches();
+  });
+
+  /* Les messages */
+  const titre = document.createElement('p');
+  titre.className = 'etiquette';
+  titre.textContent = 'Mes messages pour ce contact';
+  const liste = document.createElement('div');
+  dedans.append(titre, liste);
+
+  const dessinerMessages = () => {
+    liste.innerHTML = '';
+    if (!contact.messages.length) {
+      const vide = document.createElement('p');
+      vide.innerHTML = "<small>Aucun message pour l'instant.</small>";
+      liste.appendChild(vide);
+    }
+    contact.messages.forEach((m, n) => {
+      const bloc = document.createElement('div');
+      bloc.className = 'message-reglage';
+      const etiquette = document.createElement('label');
+      etiquette.setAttribute('for', base + '-msg-' + m.id);
+      etiquette.textContent = 'Message ' + (n + 1);
+      const zoneTexte = document.createElement('textarea');
+      zoneTexte.id = base + '-msg-' + m.id;
+      zoneTexte.maxLength = 500;
+      zoneTexte.value = m.texte;
+      zoneTexte.addEventListener('input', () => {
+        m.texte = zoneTexte.value;
+        sauverReglages();
+        majResume();
+      });
+      const supprimer = document.createElement('button');
+      supprimer.type = 'button';
+      supprimer.textContent = 'Supprimer ce message';
+      supprimer.setAttribute('aria-label', 'Supprimer le message ' + (n + 1));
+      deuxAppuis(supprimer, 'Confirmer la suppression', () => {
+        contact.messages.splice(n, 1);
+        sauverReglages();
+        dessinerMessages();
+        majResume();
+        champAjout.focus();
+        annoncer('Message supprimé.');
+      });
+      bloc.append(etiquette, zoneTexte, supprimer);
+      liste.appendChild(bloc);
+    });
+    const plein = contact.messages.length >= MAX_MESSAGES;
+    champAjout.disabled = plein;
+    boutonAjout.disabled = plein;
+    champAjout.placeholder = plein ? MAX_MESSAGES + ' messages au plus' : 'Un nouveau message';
+  };
+
+  /* Ajouter un message */
+  const etiquetteAjout = document.createElement('label');
+  etiquetteAjout.setAttribute('for', base + '-ajout');
+  etiquetteAjout.textContent = 'Ajouter un message';
+  etiquetteAjout.style.marginTop = '14px';
+  const champAjout = document.createElement('textarea');
+  champAjout.id = base + '-ajout';
+  champAjout.className = 'champ-libre';
+  champAjout.maxLength = 500;
+  const boutonAjout = document.createElement('button');
+  boutonAjout.type = 'button';
+  boutonAjout.textContent = 'Ajouter ce message';
+  boutonAjout.style.margin = '8px 0 16px';
+  boutonAjout.addEventListener('click', () => {
+    const texte = champAjout.value.trim();
+    if (!texte) { champAjout.focus(); return; }
+    if (contact.messages.length >= MAX_MESSAGES) return;
+    contact.messages.push({ id: nouvelId(), texte: texte });
+    sauverReglages();
+    champAjout.value = '';
+    dessinerMessages();
+    majResume();
+    champAjout.focus();
+    annoncer('Message ajouté.');
+  });
+  dedans.append(etiquetteAjout, champAjout, boutonAjout);
+
+  /* Supprimer le contact, deux appuis */
+  const supprimerContact = document.createElement('button');
+  supprimerContact.type = 'button';
+  supprimerContact.textContent = 'Supprimer ce contact';
+  supprimerContact.style.marginBottom = '10px';
+  deuxAppuis(supprimerContact, 'Confirmer : supprimer ' + nomContact(contact), () => {
+    reglages.contacts = reglages.contacts.filter((c) => c !== contact);
+    sauverReglages();
+    construireReglagesProches();
+    $('#r-proche-nom').focus();
+    annoncer('Contact supprimé.');
+  });
+  dedans.appendChild(supprimerContact);
+
+  dessinerMessages();
+  return details;
+}
+
+function messageAjoutProche(texte) {
+  const zone = $('#r-proche-erreur');
+  zone.textContent = texte;
+  zone.classList.toggle('masque', !texte);
+}
+
+$('#r-proche-ajouter').addEventListener('click', () => {
+  const nom = $('#r-proche-nom').value.trim();
+  const tel = $('#r-proche-tel').value.trim();
+  if (!/\d/.test(tel)) {
+    messageAjoutProche('Écris son numéro, avec des chiffres : par exemple 06 12 34 56 78.');
+    $('#r-proche-tel').focus();
+    return;
+  }
+  if (reglages.contacts.length >= MAX_CONTACTS) {
+    messageAjoutProche(MAX_CONTACTS + ' contacts au plus. Supprimes-en un pour en ajouter un autre.');
+    return;
+  }
+  const contact = {
+    id: nouvelId(),
+    nom: couper(nom, 40),
+    tel: couper(tel, 30),
+    messages: MESSAGES_PROCHE_DEFAUT.map((texte) => ({ id: nouvelId(), texte: texte }))
+  };
+  /* Une copie neuve, jamais REGLAGES_DEFAUT.contacts. */
+  reglages.contacts = reglages.contacts.concat(contact);
+  sauverReglages();
+  $('#r-proche-nom').value = '';
+  $('#r-proche-tel').value = '';
+  messageAjoutProche('');
+  construireReglagesProches();
+  /* Son encadré s'ouvre, pour relire les deux messages d'exemple. */
+  const carte = $('#r-proches details[data-id="' + contact.id + '"]');
+  carte.open = true;
+  carte.querySelector('summary').focus();
+  annoncer(nomContact(contact) + ' ajouté, avec deux messages d\'exemple à modifier.');
+});
+
+/* Raccourci : reprendre le contact d'urgence plutôt que de le retaper.
+   Les deux restent indépendants ensuite. */
+$('#r-proche-reprendre').addEventListener('click', () => {
+  if (!reglages.nom && !reglages.tel) {
+    messageAjoutProche("Aucun contact d'urgence n'est enregistré pour l'instant.");
+    return;
+  }
+  $('#r-proche-nom').value = reglages.nom || '';
+  $('#r-proche-tel').value = reglages.tel || '';
+  messageAjoutProche('');
+  $('#r-proche-ajouter').focus();
+  annoncer("Contact d'urgence repris. Touche « Ajouter ce contact » pour l'enregistrer.");
+});
+
+
+/* ============================================================
    12. SAUVEGARDE ET RESTAURATION
    ------------------------------------------------------------
    Tout ce que vous saisissez vit dans le navigateur (localStorage
@@ -3751,6 +4124,12 @@ function nettoyerReglages(r) {
   if ('echelle' in propre && !(propre.echelle >= 0.5 && propre.echelle <= 2)) delete propre.echelle;
   /* 0 veut dire « Sans fin » : c'est une valeur valable. */
   if ('dureeRespi' in propre && !(propre.dureeRespi >= 0 && propre.dureeRespi <= 60)) delete propre.dureeRespi;
+  /* Les contacts sont vérifiés un par un, comme le reste du fichier. */
+  if ('contacts' in propre) {
+    const contacts = nettoyerContacts(propre.contacts);
+    if (contacts) propre.contacts = contacts;
+    else delete propre.contacts;
+  }
   return propre;
 }
 
@@ -3786,6 +4165,7 @@ function resumeRestauration(r) {
   if (r.protocole) contenu.push('ton protocole');
   if (r.protocole && r.protocole.emotions) contenu.push('tes procédures par émotion');
   if (r.reglages && Object.keys(r.reglages).length) contenu.push('tes réglages');
+  if (r.reglages && r.reglages.contacts) contenu.push('tes proches et leurs messages');
   if (!contenu.length) return null;
 
   const liste = contenu.length > 1
@@ -3900,7 +4280,9 @@ $('#btn-restaurer-confirmer').addEventListener('click', async () => {
   }
 
   if (r.reglages && Object.keys(r.reglages).length) {
-    reglages = { ...REGLAGES_DEFAUT, ...r.reglages };
+    /* Une sauvegarde d'avant « Mes proches » n'a pas de contacts : on
+       garde alors ceux du téléphone, au lieu de les effacer. */
+    reglages = { ...REGLAGES_DEFAUT, contacts: reglages.contacts, ...r.reglages };
     sauverReglages();
   }
 
@@ -3946,6 +4328,7 @@ async function demarrer() {
   appliquerTheme();
   initReglages();
   majBoutonAide();
+  construireReglagesProches();   /* et le bouton « Écrire à un proche » */
 
   try { await BDD.ouvrir(); } catch (e) { console.error('Base locale indisponible.', e); }
 
