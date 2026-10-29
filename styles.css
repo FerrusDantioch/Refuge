@@ -734,3 +734,66 @@ html[data-bouclier="on"] .phrases button[aria-pressed="true"] { background: #101
 @media not all and (display-mode: browser) {
   .note-installation { display: none; }
 }
+
+/* ============================================================
+   15. PROCÉDURES PAR ÉMOTION
+   Des smileys en gros, faciles à toucher : deux par ligne, au
+   moins 132 px de haut. Les smileys en couleur sont adoucis
+   (saturation réduite) ; en bouclier, ils passent en gris sombre,
+   sinon ce seraient les seuls points jaunes vifs d'un écran noir.
+   ============================================================ */
+.grille-emotions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grille-emotions button {
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+/* Un nombre impair d'émotions : la dernière prend toute la largeur. */
+.grille-emotions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.smiley { font-size: 3rem; line-height: 1; filter: saturate(0.7); }
+.smiley-petit { font-size: 1.5rem; line-height: 1; filter: saturate(0.7); vertical-align: middle; }
+html[data-bouclier="on"] .smiley,
+html[data-bouclier="on"] .smiley-petit { filter: grayscale(1) brightness(0.6); }
+
+#procedure-titre { display: flex; align-items: center; gap: 12px; font-size: 1.4rem; }
+#procedure-etapes .proposition { font-size: 1.08rem; }
+
+/* Réglages : une émotion par encadré dépliable. Le titre fait au
+   moins 60 px de haut pour se toucher facilement. */
+.emotion-reglage { border: 1px solid var(--bord); border-radius: 14px; margin-bottom: 12px; }
+.emotion-reglage > summary {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.emotion-reglage[open] > summary { border-bottom: 1px solid var(--bord); }
+.emotion-reglage .dedans { padding: 14px 12px 6px; }
+.emotion-reglage summary small { font-weight: 400; margin-left: auto; }
+.choix-smiley { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.choix-smiley button { padding: 6px; font-size: 1.6rem; line-height: 1; }
+.choix-smiley button[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-fond); }
+.etape-reglage { border-top: 1px solid var(--bord); padding: 12px 0; }
+.etape-reglage label { margin-bottom: 4px; }
+/* Deux lignes de haut : une étape longue se lit en entier. */
+.etape-reglage textarea { min-height: 64px; margin-bottom: 8px; }
+/* Trois boutons côte à côte, même sur un téléphone de 360 px : ils
+   peuvent rétrécir sous la largeur de leur mot (min-width: 0). */
+.etape-reglage .bouton-rangee { gap: 6px; }
+.etape-reglage .bouton-rangee button {
+  min-width: 0;
+  padding: 8px 2px;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+/* Un bouton qui ne peut pas servir (« Monter » sur la première étape) :
+   estompé, mais toujours lisible. */
+.emotion-reglage button:disabled { opacity: 0.45; cursor: default; }

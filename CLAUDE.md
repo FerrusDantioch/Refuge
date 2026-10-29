@@ -78,6 +78,20 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   consigne, et des `id` qui ne changent jamais. Son bouton d'accueil et son
   écran disparaissent en bouclier, comme les liens apaisants. Une
   sauvegarde plus ancienne (sans `monte`) ne l'efface pas à la restauration.
+- **Procédures par émotion (« Ce que je ressens ») : pour soi, jamais sur
+  la carte.** Rangées dans `protocole.emotions` (même enregistrement, même
+  sauvegarde que le protocole), elles n'entrent jamais dans
+  `lignesProtocole()`. Exemples de départ dans `EMOTIONS_DEFAUT`, définis
+  **avant** `let protocole` (sinon erreur au démarrage). Contrairement au
+  protocole, tout y est modifiable par la personne (nom, smiley, étapes) ;
+  les `id` d'émotions et d'étapes retiennent les cases cochées et ne
+  changent pas. Les cases cochées pendant la crise sont à part
+  (`refuge.emotionsCoches`, localStorage, effacées après 6 h) et hors
+  sauvegarde. Une sauvegarde sans `emotions` ne les efface pas à la
+  restauration. **Reste visible et lisible en bouclier** (contrairement à
+  « Quand ça monte ») ; les smileys y passent en gris. Noms sans accord
+  (« Colère », « Épuisement ») ; étapes à l'infinitif ou à la première
+  personne, jamais une consigne médicale.
 - **Phrases courtes à montrer : seulement pour « Montrer un message ».**
   Elles s'affichent en grand et ne déclenchent jamais rien (ni SMS, ni
   appel). Absentes de la carte « J'ai besoin d'aide ». Elles parlent aux

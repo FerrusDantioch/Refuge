@@ -2188,14 +2188,103 @@ const THEMES_MONTEE = [
   }
 ];
 
+/* ------------------------------------------------------------
+   PROCÉDURES PAR ÉMOTION — les exemples de départ
+   ------------------------------------------------------------
+   Cinq émotions, chacune avec quelques étapes d'exemple. Contrairement
+   au protocole, TOUT ici appartient ensuite à la personne : elle change
+   les noms, les smileys et les étapes dans les Réglages. Ces exemples ne
+   servent qu'au premier démarrage, et au bouton « Remettre les exemples
+   de départ ».
+
+   Les noms sont des noms (« Colère ») plutôt que des adjectifs
+   (« en colère », « épuisé ») : ils conviennent à tout le monde, sans
+   accord au masculin ou au féminin.
+
+   Mêmes règles d'écriture que « Quand ça monte » : des étapes pour soi,
+   à l'infinitif ou à la première personne, de l'information et jamais
+   une consigne médicale. Pour soi seulement : rien de tout cela ne doit
+   entrer dans lignesProtocole() ni sur la carte.
+   Les « id » (émotions et étapes) retiennent les cases cochées : ne pas
+   modifier ceux qui sont déjà publiés.
+   ------------------------------------------------------------ */
+
+const EMOTIONS_DEFAUT = [
+  {
+    id: 'anxiete', nom: 'Anxiété', smiley: '😟',
+    etapes: [
+      'Aller dans un endroit calme, dos au mur',
+      'Respirer avec Refuge, quelques minutes',
+      'Poser les pieds bien à plat et sentir le sol',
+      'Nommer cinq choses que je vois autour de moi',
+      "Prévenir quelqu'un de confiance"
+    ]
+  },
+  {
+    id: 'surcharge', nom: 'Surcharge', smiley: '😖',
+    etapes: [
+      "Mettre mon casque ou mes bouchons d'oreilles",
+      'Mettre mes lunettes de soleil, ou fermer les yeux',
+      "M'éloigner du bruit et de la foule",
+      'Allumer le bouclier sensoriel',
+      "Ne rien décider pour l'instant"
+    ]
+  },
+  {
+    id: 'colere', nom: 'Colère', smiley: '😠',
+    etapes: [
+      "M'éloigner de la situation, sans me justifier",
+      'Serrer fort un coussin ou un objet dans les mains',
+      "Boire un verre d'eau fraîche",
+      'Marcher, bouger, me balancer',
+      'Attendre avant de répondre à qui que ce soit'
+    ]
+  },
+  {
+    id: 'tristesse', nom: 'Tristesse', smiley: '😢',
+    etapes: [
+      "M'envelopper dans une couverture lourde",
+      'Prendre mon objet réconfortant',
+      "Regarder ou écouter quelque chose qui m'apaise",
+      'Noter ce que je ressens dans le journal, si je veux',
+      "Envoyer un message à quelqu'un de confiance"
+    ]
+  },
+  {
+    id: 'epuisement', nom: 'Épuisement', smiley: '😩',
+    etapes: [
+      "M'allonger au calme, dans la pénombre",
+      'Annuler ce qui peut attendre',
+      'Boire et manger quelque chose de simple',
+      "Ne plus parler pour l'instant",
+      'Me reposer sans écran'
+    ]
+  }
+];
+
+/* Une copie neuve des exemples, au format rangé dans le protocole :
+   chaque étape reçoit un id stable (« anxiete-1 », « anxiete-2 »…). */
+function emotionsDefaut() {
+  return EMOTIONS_DEFAUT.map((e) => ({
+    id: e.id,
+    nom: e.nom,
+    smiley: e.smiley,
+    etapes: e.etapes.map((texte, i) => ({ id: e.id + '-' + (i + 1), texte: texte }))
+  }));
+}
+
 const monteVide = () => ({ coches: [], libres: {} });
 
 /* Ce que Refuge retient de vos choix. « coches » est une liste d'id,
    « libres » vos propres lignes, thème par thème, et « fond » le fond
    choisi pour la carte image (voir section 10) : 'sombre' ou 'clair'.
    « monte » garde la partie « Quand je sens que ça monte », sur le même
-   modèle (coches et lignes libres). */
-let protocole = { coches: [], libres: {}, contactNom: '', contactTel: '', fond: 'sombre', monte: monteVide() };
+   modèle (coches et lignes libres). « emotions » garde les procédures
+   par émotion (section 9 bis). */
+let protocole = {
+  coches: [], libres: {}, contactNom: '', contactTel: '', fond: 'sombre',
+  monte: monteVide(), emotions: emotionsDefaut()
+};
 
 /* L'écriture dans la base est différée de quelques centièmes de seconde :
    taper dans un champ libre déclencherait sinon une écriture par lettre. */
@@ -2296,6 +2385,7 @@ function afficherProtocole() {
   });
   majResumeProtocole();
   afficherMonte();
+  construireReglagesEmotions();
 }
 
 /* Les lignes libres d'un thème, nettoyées : une par ligne, sans vide. */
@@ -2536,13 +2626,476 @@ function initProtocole() {
           contactNom: enregistre.contactNom || '',
           contactTel: enregistre.contactTel || '',
           fond: enregistre.fond === 'clair' ? 'clair' : 'sombre',
-          monte: nettoyerMonte(enregistre.monte) || monteVide()
+          monte: nettoyerMonte(enregistre.monte) || monteVide(),
+          /* Absent (protocole enregistré avant cette version) : les
+             exemples de départ. */
+          emotions: nettoyerEmotions(enregistre.emotions) || emotionsDefaut()
         };
       }
       afficherProtocole();
     })
     .catch((e) => { console.warn('Protocole illisible.', e); afficherProtocole(); });
 }
+
+
+/* ============================================================
+   9 bis. PROCÉDURES PAR ÉMOTION
+   ------------------------------------------------------------
+   Rangées DANS le protocole (protocole.emotions), comme « Quand ça
+   monte » : même écriture (enregistrerProtocole), même tiroir, et donc
+   la même sauvegarde JSON, sans rien de plus à faire. Les exemples de
+   départ (EMOTIONS_DEFAUT) sont plus haut, en section 9.
+
+   Une émotion : { id, nom, smiley, etapes: [{ id, texte }] }.
+
+   Les cases cochées pendant une crise ne sont PAS dans le protocole :
+   elles ne servent que le temps de la crise. Elles sont gardées à part
+   (localStorage), pour survivre si le téléphone ferme Refuge pendant
+   qu'on envoie un SMS, et s'effacent toutes seules après 6 heures sans
+   changement. Elles ne partent pas dans la sauvegarde.
+   ============================================================ */
+
+const MAX_EMOTIONS = 10;
+const MAX_ETAPES = 30;
+
+/* Les smileys proposés dans les Réglages : des visages simples, connus
+   de tous les téléphones (rien de récent qui s'afficherait en carré). */
+const SMILEYS_PROPOSES = ['😟', '😰', '😖', '😣', '😠', '😤', '😢', '😞', '😩', '😴', '😶', '😐'];
+
+/* Un identifiant unique pour une étape ajoutée par la personne. */
+const nouvelId = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+/* Coupe un texte à n caractères sans casser un smiley en deux. */
+const couper = (texte, n) => Array.from(texte).slice(0, n).join('');
+
+/* Vérifie ce qui vient de la base ou d'un fichier de sauvegarde, champ
+   par champ. null si absent ou inutilisable : l'appelant garde alors ce
+   qu'il a déjà (c'est le cas des sauvegardes d'avant cette version). */
+function nettoyerEmotions(liste) {
+  if (!Array.isArray(liste)) return null;
+  const idsVus = new Set();
+  const unique = (id) => {
+    const propre = typeof id === 'string' && id ? id.slice(0, 60) : nouvelId();
+    const final = idsVus.has(propre) ? nouvelId() : propre;
+    idsVus.add(final);
+    return final;
+  };
+  const propres = liste
+    .filter((e) => e && typeof e === 'object')
+    .slice(0, MAX_EMOTIONS)
+    .map((e, i) => {
+      const defaut = EMOTIONS_DEFAUT[i % EMOTIONS_DEFAUT.length];
+      const smiley = typeof e.smiley === 'string' ? couper(e.smiley.trim(), 8) : '';
+      return {
+        id: unique(e.id),
+        nom: typeof e.nom === 'string' ? couper(e.nom, 40) : '',
+        smiley: smiley || defaut.smiley,
+        etapes: (Array.isArray(e.etapes) ? e.etapes : [])
+          .filter((x) => x && typeof x === 'object' && typeof x.texte === 'string')
+          .slice(0, MAX_ETAPES)
+          .map((x) => ({ id: unique(x.id), texte: couper(x.texte, 200) }))
+      };
+    });
+  return propres.length ? propres : null;
+}
+
+const nomEmotion = (e, i) => (e.nom || '').trim() || 'Émotion ' + (i + 1);
+/* Une étape vidée dans les Réglages n'apparaît pas pendant la crise. */
+const etapesRemplies = (e) => e.etapes.filter((x) => x.texte.trim());
+
+/* Deux appuis volontaires, comme partout dans Refuge : le premier change
+   le texte du bouton, le second (dans les 4 secondes) agit. */
+function deuxAppuis(bouton, texteConfirmer, action) {
+  let arme = null;
+  const texte = bouton.textContent;
+  const aria = bouton.getAttribute('aria-label');
+  const remettre = () => {
+    arme = null;
+    bouton.textContent = texte;
+    if (aria) bouton.setAttribute('aria-label', aria);
+  };
+  bouton.addEventListener('click', () => {
+    if (!arme) {
+      bouton.textContent = texteConfirmer;
+      if (aria) bouton.removeAttribute('aria-label');
+      arme = setTimeout(remettre, 4000);
+      return;
+    }
+    clearTimeout(arme);
+    remettre();
+    action();
+  });
+}
+
+/* --- Les cases cochées pendant la crise --- */
+
+const CLE_COCHES_EMOTIONS = 'refuge.emotionsCoches';
+const DUREE_COCHES_MS = 6 * 60 * 60 * 1000;
+
+/* { idEmotion: [idEtape, …] }, ou {} si rien, ou si trop ancien. */
+function lireCochesEmotions() {
+  try {
+    const d = JSON.parse(localStorage.getItem(CLE_COCHES_EMOTIONS));
+    if (d && d.coches && typeof d.coches === 'object' && Date.now() - d.ts < DUREE_COCHES_MS) return d.coches;
+  } catch (e) { /* rien */ }
+  return {};
+}
+
+function ecrireCochesEmotions(coches) {
+  try {
+    localStorage.setItem(CLE_COCHES_EMOTIONS, JSON.stringify({ ts: Date.now(), coches: coches }));
+  } catch (e) { /* rien : les cases restent cochées à l'écran */ }
+}
+
+/* --- L'écran plein « Ce que je ressens » --- */
+
+let emotionOuverte = null;   /* l'id de l'émotion affichée, ou null */
+
+function ouvrirEcranEmotions(ouvert) {
+  const ecran = $('#ecran-emotions');
+  ecran.hidden = !ouvert;
+  if (!ouvert) {
+    emotionOuverte = null;
+    if ($('#btn-emotions').offsetParent) $('#btn-emotions').focus();
+    return;
+  }
+  montrerChoixEmotions();
+  ecran.focus({ preventScroll: true });
+  annoncer('Ce que je ressens.');
+}
+
+/* Premier temps : les émotions, en gros smileys. */
+function montrerChoixEmotions() {
+  emotionOuverte = null;
+  const grille = $('#emotions-grille');
+  grille.innerHTML = '';
+  protocole.emotions.forEach((emotion, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const smiley = document.createElement('span');
+    smiley.className = 'smiley';
+    smiley.setAttribute('aria-hidden', 'true');
+    smiley.textContent = emotion.smiley;
+    const nom = document.createElement('span');
+    nom.textContent = nomEmotion(emotion, i);
+    b.append(smiley, nom);
+    b.addEventListener('click', () => montrerProcedure(emotion.id));
+    grille.appendChild(b);
+  });
+  $('#emotions-choix').hidden = false;
+  $('#emotions-procedure').hidden = true;
+  const ecran = $('#ecran-emotions');
+  ecran.setAttribute('aria-labelledby', 'emotions-titre');
+  ecran.scrollTop = 0;
+}
+
+/* Second temps : les étapes de l'émotion touchée, à cocher. */
+function montrerProcedure(id) {
+  const i = protocole.emotions.findIndex((e) => e.id === id);
+  if (i === -1) { montrerChoixEmotions(); return; }
+  const emotion = protocole.emotions[i];
+  emotionOuverte = id;
+
+  const titre = $('#procedure-titre');
+  titre.innerHTML = '';
+  const smiley = document.createElement('span');
+  smiley.className = 'smiley';
+  smiley.setAttribute('aria-hidden', 'true');
+  smiley.textContent = emotion.smiley;
+  titre.append(smiley, document.createTextNode(nomEmotion(emotion, i)));
+
+  const faites = lireCochesEmotions()[id] || [];
+  const etapes = etapesRemplies(emotion);
+  const zone = $('#procedure-etapes');
+  zone.innerHTML = '';
+  etapes.forEach((etape, n) => {
+    const ligne = document.createElement('label');
+    ligne.className = 'proposition';
+    ligne.setAttribute('for', 'procedure-' + n);
+    const coche = document.createElement('input');
+    coche.type = 'checkbox';
+    coche.id = 'procedure-' + n;
+    coche.checked = faites.includes(etape.id);
+    coche.addEventListener('change', () => {
+      const toutes = lireCochesEmotions();
+      const liste = (toutes[id] || []).filter((x) => x !== etape.id);
+      if (coche.checked) liste.push(etape.id);
+      toutes[id] = liste;
+      ecrireCochesEmotions(toutes);
+    });
+    const texte = document.createElement('span');
+    texte.textContent = etape.texte;
+    ligne.append(coche, texte);
+    zone.appendChild(ligne);
+  });
+  $('#procedure-vide').classList.toggle('masque', etapes.length > 0);
+  $('#procedure-decocher').classList.toggle('masque', etapes.length === 0);
+
+  $('#emotions-choix').hidden = true;
+  $('#emotions-procedure').hidden = false;
+  const ecran = $('#ecran-emotions');
+  ecran.setAttribute('aria-labelledby', 'procedure-titre');
+  ecran.scrollTop = 0;
+  ecran.focus({ preventScroll: true });
+  annoncer(nomEmotion(emotion, i) + '. ' + etapes.length
+    + (etapes.length > 1 ? ' étapes.' : ' étape.'));
+}
+
+$('#btn-emotions').addEventListener('click', () => ouvrirEcranEmotions(true));
+$('#emotions-fermer').addEventListener('click', () => ouvrirEcranEmotions(false));
+$('#procedure-retour').addEventListener('click', () => {
+  montrerChoixEmotions();
+  $('#ecran-emotions').focus({ preventScroll: true });
+  annoncer('Choisis une émotion.');
+});
+deuxAppuis($('#procedure-decocher'), 'Confirmer : tout décocher', () => {
+  const toutes = lireCochesEmotions();
+  delete toutes[emotionOuverte];
+  ecrireCochesEmotions(toutes);
+  montrerProcedure(emotionOuverte);
+  annoncer('Tout est décoché.');
+});
+
+/* --- Les Réglages : une carte dépliable par émotion --- */
+
+function construireReglagesEmotions() {
+  const zone = $('#r-emotions');
+  /* Les encadrés ouverts le restent quand on reconstruit. */
+  const ouverts = new Set($$('#r-emotions details[open]').map((d) => d.dataset.id));
+  zone.innerHTML = '';
+  protocole.emotions.forEach((emotion, i) => {
+    zone.appendChild(carteReglageEmotion(emotion, i, ouverts.has(emotion.id)));
+  });
+}
+
+function carteReglageEmotion(emotion, i, ouvert) {
+  const details = document.createElement('details');
+  details.className = 'emotion-reglage';
+  details.dataset.id = emotion.id;
+  details.open = ouvert;
+
+  const resume = document.createElement('summary');
+  const majResume = () => {
+    resume.innerHTML = '';
+    const smiley = document.createElement('span');
+    smiley.className = 'smiley-petit';
+    smiley.setAttribute('aria-hidden', 'true');
+    smiley.textContent = emotion.smiley;
+    const nom = document.createElement('span');
+    nom.textContent = nomEmotion(emotion, i);
+    const total = etapesRemplies(emotion).length;
+    const compte = document.createElement('small');
+    compte.textContent = total + (total > 1 ? ' étapes' : ' étape');
+    resume.append(smiley, nom, compte);
+  };
+  majResume();
+  details.appendChild(resume);
+
+  const dedans = document.createElement('div');
+  dedans.className = 'dedans';
+  details.appendChild(dedans);
+  const base = 'emo-' + emotion.id;
+
+  /* Le nom */
+  const etiquetteNom = document.createElement('label');
+  etiquetteNom.setAttribute('for', base + '-nom');
+  etiquetteNom.textContent = 'Nom';
+  const champNom = document.createElement('input');
+  champNom.type = 'text';
+  champNom.id = base + '-nom';
+  champNom.maxLength = 40;
+  champNom.value = emotion.nom;
+  champNom.addEventListener('input', () => {
+    emotion.nom = champNom.value;
+    enregistrerProtocole();
+    majResume();
+  });
+  dedans.append(etiquetteNom, champNom);
+
+  /* Le smiley : un choix de visages, ou n'importe lequel tapé au clavier. */
+  const titreSmiley = document.createElement('p');
+  titreSmiley.className = 'etiquette';
+  titreSmiley.id = base + '-smiley-titre';
+  titreSmiley.textContent = 'Smiley';
+  const choix = document.createElement('div');
+  choix.className = 'choix-smiley';
+  choix.setAttribute('role', 'group');
+  choix.setAttribute('aria-labelledby', titreSmiley.id);
+  const champSmiley = document.createElement('input');
+  const majChoix = () => {
+    Array.from(choix.children).forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.smiley === emotion.smiley));
+    });
+  };
+  SMILEYS_PROPOSES.forEach((s) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'smiley-petit';
+    b.dataset.smiley = s;
+    b.textContent = s;
+    b.addEventListener('click', () => {
+      emotion.smiley = s;
+      champSmiley.value = '';
+      majChoix();
+      majResume();
+      enregistrerProtocole(true);
+    });
+    choix.appendChild(b);
+  });
+  majChoix();
+
+  const etiquetteSmiley = document.createElement('label');
+  etiquetteSmiley.setAttribute('for', base + '-smiley');
+  etiquetteSmiley.textContent = 'Ou un autre smiley, tapé au clavier';
+  champSmiley.type = 'text';
+  champSmiley.id = base + '-smiley';
+  champSmiley.value = SMILEYS_PROPOSES.includes(emotion.smiley) ? '' : emotion.smiley;
+  champSmiley.placeholder = 'Facultatif';
+  champSmiley.addEventListener('input', () => {
+    const s = couper(champSmiley.value.trim(), 8);
+    if (!s) return;   /* un champ vidé garde le smiley d'avant */
+    emotion.smiley = s;
+    majChoix();
+    majResume();
+    enregistrerProtocole();
+  });
+  dedans.append(titreSmiley, choix, etiquetteSmiley, champSmiley);
+
+  /* Les étapes */
+  const titreEtapes = document.createElement('p');
+  titreEtapes.className = 'etiquette';
+  titreEtapes.textContent = "Les étapes, dans l'ordre";
+  const liste = document.createElement('div');
+  dedans.append(titreEtapes, liste);
+
+  /* Redessine la liste. « focus » : [id de l'étape, action] du bouton à
+     qui rendre la main, pour ne pas perdre sa place après un déplacement. */
+  const dessinerEtapes = (focus) => {
+    liste.innerHTML = '';
+    if (!emotion.etapes.length) {
+      const vide = document.createElement('p');
+      vide.innerHTML = '<small>Aucune étape pour l\'instant.</small>';
+      liste.appendChild(vide);
+    }
+    emotion.etapes.forEach((etape, n) => {
+      const bloc = document.createElement('div');
+      bloc.className = 'etape-reglage';
+
+      const etiquette = document.createElement('label');
+      etiquette.setAttribute('for', base + '-etape-' + etape.id);
+      etiquette.textContent = 'Étape ' + (n + 1);
+      /* Une zone de deux lignes plutôt qu'un champ d'une ligne : une
+         étape longue se lit en entier. Une étape reste une seule ligne :
+         les retours à la ligne deviennent des espaces. */
+      const champ = document.createElement('textarea');
+      champ.id = base + '-etape-' + etape.id;
+      champ.rows = 2;
+      champ.maxLength = 200;
+      champ.value = etape.texte;
+      champ.addEventListener('input', () => {
+        if (champ.value.includes('\n')) champ.value = champ.value.replace(/\n+/g, ' ');
+        etape.texte = champ.value;
+        enregistrerProtocole();
+        majResume();
+      });
+
+      const rangee = document.createElement('div');
+      rangee.className = 'bouton-rangee';
+      const bouton = (texte, action, aria) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = texte;
+        b.dataset.etape = etape.id;
+        b.dataset.action = action;
+        b.setAttribute('aria-label', aria + ' ' + (n + 1));
+        rangee.appendChild(b);
+        return b;
+      };
+      const monter = bouton('Monter', 'monter', "Monter l'étape");
+      const descendre = bouton('Descendre', 'descendre', "Descendre l'étape");
+      const supprimer = bouton('Supprimer', 'supprimer', "Supprimer l'étape");
+      monter.disabled = n === 0;
+      descendre.disabled = n === emotion.etapes.length - 1;
+
+      const deplacer = (sens) => {
+        const cible = n + sens;
+        [emotion.etapes[n], emotion.etapes[cible]] = [emotion.etapes[cible], emotion.etapes[n]];
+        enregistrerProtocole(true);
+        /* Le bouton suit l'étape ; s'il est devenu inutilisable (arrivée
+           en haut ou en bas), on passe à l'autre. */
+        const bord = sens < 0 ? cible === 0 : cible === emotion.etapes.length - 1;
+        const action = sens < 0 ? (bord ? 'descendre' : 'monter') : (bord ? 'monter' : 'descendre');
+        dessinerEtapes([etape.id, action]);
+        annoncer('Étape déplacée en position ' + (cible + 1) + '.');
+      };
+      monter.addEventListener('click', () => deplacer(-1));
+      descendre.addEventListener('click', () => deplacer(1));
+      deuxAppuis(supprimer, 'Confirmer', () => {
+        emotion.etapes.splice(n, 1);
+        enregistrerProtocole(true);
+        majResume();
+        const suivante = emotion.etapes[Math.min(n, emotion.etapes.length - 1)];
+        dessinerEtapes(suivante ? [suivante.id, 'supprimer'] : null);
+        if (!suivante) champAjout.focus();
+        annoncer('Étape supprimée.');
+      });
+
+      bloc.append(etiquette, champ, rangee);
+      liste.appendChild(bloc);
+    });
+    if (focus) {
+      const b = liste.querySelector('button[data-etape="' + focus[0] + '"][data-action="' + focus[1] + '"]');
+      if (b && !b.disabled) b.focus();
+    }
+    const plein = emotion.etapes.length >= MAX_ETAPES;
+    champAjout.disabled = plein;
+    boutonAjout.disabled = plein;
+    champAjout.placeholder = plein ? MAX_ETAPES + ' étapes au plus' : 'Une nouvelle étape';
+  };
+
+  /* Ajouter une étape, à la fin */
+  const etiquetteAjout = document.createElement('label');
+  etiquetteAjout.setAttribute('for', base + '-ajout');
+  etiquetteAjout.textContent = 'Ajouter une étape';
+  etiquetteAjout.style.marginTop = '14px';
+  const ligneAjout = document.createElement('div');
+  ligneAjout.className = 'ajout-ligne';
+  const champAjout = document.createElement('input');
+  champAjout.type = 'text';
+  champAjout.id = base + '-ajout';
+  champAjout.maxLength = 200;
+  const boutonAjout = document.createElement('button');
+  boutonAjout.type = 'button';
+  boutonAjout.textContent = 'Ajouter';
+  const ajouter = () => {
+    const texte = champAjout.value.trim();
+    if (!texte) { champAjout.focus(); return; }
+    if (emotion.etapes.length >= MAX_ETAPES) return;
+    emotion.etapes.push({ id: nouvelId(), texte: texte });
+    enregistrerProtocole(true);
+    champAjout.value = '';
+    dessinerEtapes();
+    majResume();
+    champAjout.focus();
+    annoncer('Étape ajoutée : ' + texte);
+  };
+  boutonAjout.addEventListener('click', ajouter);
+  champAjout.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); ajouter(); }
+  });
+  ligneAjout.append(champAjout, boutonAjout);
+  dedans.append(etiquetteAjout, ligneAjout);
+
+  dessinerEtapes();
+  return details;
+}
+
+deuxAppuis($('#r-emotions-defaut'), 'Confirmer : remplacer mes émotions par les exemples', () => {
+  protocole.emotions = emotionsDefaut();
+  enregistrerProtocole(true);
+  construireReglagesEmotions();
+  annoncer('Les exemples de départ sont remis.');
+});
 
 
 /* ============================================================
@@ -3177,7 +3730,10 @@ function nettoyerProtocole(p) {
     fond: p.fond === 'clair' ? 'clair' : 'sombre',
     /* null si le fichier date d'avant « Quand ça monte » (version 2.1) :
        on garde alors ce qui est déjà sur le téléphone. */
-    monte: nettoyerMonte(p.monte)
+    monte: nettoyerMonte(p.monte),
+    /* null si le fichier date d'avant les procédures par émotion : on
+       garde alors celles du téléphone. */
+    emotions: nettoyerEmotions(p.emotions)
   };
 }
 
@@ -3225,6 +3781,7 @@ function resumeRestauration(r) {
   if (r.crises && r.crises.length) contenu.push(pluriel(r.crises.length, 'entrée de journal', 'entrées de journal'));
   if (r.liens && r.liens.length) contenu.push(pluriel(r.liens.length, 'lien apaisant', 'liens apaisants'));
   if (r.protocole) contenu.push('ton protocole');
+  if (r.protocole && r.protocole.emotions) contenu.push('tes procédures par émotion');
   if (r.reglages && Object.keys(r.reglages).length) contenu.push('tes réglages');
   if (!contenu.length) return null;
 
@@ -3327,6 +3884,7 @@ $('#btn-restaurer-confirmer').addEventListener('click', async () => {
       await BDD.ecrireProtocole({
         ...r.protocole,
         monte: r.protocole.monte || protocole.monte || monteVide(),
+        emotions: r.protocole.emotions || protocole.emotions || emotionsDefaut(),
         maj: Date.now()
       });
     }

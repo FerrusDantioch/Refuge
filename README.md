@@ -12,11 +12,24 @@ sur le téléphone.
 
 | Écran | À quoi il sert |
 |---|---|
-| **Accueil** | Le gros bouton d'aide (SMS pré-rempli), le bouclier sensoriel, le message à montrer (avec des phrases courtes), « Quand ça monte », les numéros d'urgence |
+| **Accueil** | Le gros bouton d'aide (SMS pré-rempli), le bouclier sensoriel, le message à montrer (avec des phrases courtes), « Ce que je ressens » (procédures par émotion), « Quand ça monte », les numéros d'urgence |
 | **Respirer** | Respiration guidée : cohérence 5-5, apaisant 4-7-8, carré 4-4-4-4 |
 | **Protocole** | Ce qui m'aide en crise, à cocher — la carte image pour l'écran verrouillé — et, pour soi, « Quand je sens que ça monte » |
 | **Journal** | Historique des crises, note en un appui, note vocale facultative, ce qui revient le plus souvent, export CSV et sauvegarde JSON |
 | **Réglages** | Contact, textes, phrases courtes, thème et gammes de couleurs, taille du texte, déclencheurs personnels, position facultative, sauvegarde et restauration de toutes les données |
+
+### Nouveauté : des procédures par émotion
+
+Sur l'accueil, « Ce que je ressens » montre cinq émotions en gros smileys :
+Anxiété, Surcharge, Colère, Tristesse, Épuisement. Un appui affiche les étapes
+prévues pour cette émotion, à cocher au fur et à mesure pendant la crise.
+Les cases cochées s'effacent toutes seules après 6 heures.
+
+Tout se prépare au calme dans les **Réglages** : nom, smiley, et étapes
+(ajouter, modifier, supprimer, monter, descendre). Des exemples sont fournis
+au départ, et un bouton permet de les remettre. L'écran reste lisible en
+bouclier sensoriel (les smileys y passent en gris). Les procédures font
+partie de la sauvegarde JSON ; une ancienne sauvegarde se restaure toujours.
 
 ### Nouveauté : une note vocale dans le journal
 
