@@ -59,6 +59,10 @@
 
     <button id="btn-respirer-vite" style="margin-bottom:16px">Respirer avec moi</button>
 
+    <!-- Procédures par émotion : préparées au calme dans les Réglages.
+         Reste visible en bouclier : l'écran est fait pour y être lu. -->
+    <button id="btn-emotions" style="margin-bottom:16px">Ce que je ressens</button>
+
     <!-- Ce que la personne a préparé au calme pour le moment où ça monte.
          N'apparaît que si elle l'a rempli (onglet Protocole), et disparaît
          en bouclier, comme les liens apaisants. -->
@@ -178,6 +182,24 @@
       <label for="f-note">Autre chose à noter (facultatif)</label>
       <textarea id="f-note" placeholder="Ce que je ressentais, ce qui a aidé…"></textarea>
 
+      <!-- Note vocale. Rien ne démarre sans appui : ni l'enregistrement,
+           ni la lecture. Toute la zone disparaît en bouclier sensoriel
+           (classe « voix ») : le bouclier, c'est le silence. -->
+      <div id="f-voix" class="voix zone-voix" role="group" aria-labelledby="voix-titre">
+        <p id="voix-titre" class="etiquette">Note vocale (facultatif)</p>
+        <p><small>Jusqu'à 5 minutes. La première fois, le téléphone te
+           demande si Refuge peut utiliser le micro. Rien n'est transcrit
+           ni envoyé : l'enregistrement reste sur ce téléphone.</small></p>
+        <p id="voix-etat" class="voix-etat masque"></p>
+        <button type="button" id="voix-enregistrer">Enregistrer ma voix</button>
+        <button type="button" id="voix-arreter" class="bouton-doux masque">Arrêter l'enregistrement</button>
+        <div id="voix-actions" class="bouton-rangee masque">
+          <button type="button" id="voix-ecouter">Écouter</button>
+          <button type="button" id="voix-effacer">Supprimer la note</button>
+        </div>
+        <p id="voix-message" class="avis masque" role="status"></p>
+      </div>
+
       <div class="bouton-rangee">
         <button type="button" id="btn-annuler">Annuler</button>
         <button type="submit" class="bouton-doux">Enregistrer</button>
@@ -195,6 +217,9 @@
          liens et tes réglages : c'est elle qu'il faut garder avant de
          changer de téléphone. Pour la remettre en place, va dans
          Réglages, « Restaurer une sauvegarde ».</small></p>
+      <p class="avis"><strong>Attention :</strong> les notes vocales ne
+         sont pas dans la sauvegarde (elles prendraient trop de place).
+         Elles restent seulement sur ce téléphone.</p>
       <div class="bouton-rangee">
         <button type="button" id="btn-export-csv">Exporter (CSV)</button>
         <button type="button" id="btn-export-json">Sauvegarde (JSON)</button>
@@ -465,6 +490,21 @@
          n'importe quelle application qui demande une position.</small></p>
     </div>
 
+    <!-- Procédures par émotion : les cartes sont construites par app.js
+         (section 9 bis) à partir de protocole.emotions. -->
+    <div class="carte">
+      <h2>Mes procédures par émotion</h2>
+      <p><small>Sur l'accueil, « Ce que je ressens » montre ces émotions en
+         gros. Un appui sur l'une d'elles affiche tes étapes, à cocher au fur
+         et à mesure. Prépare-les ici, au calme : change le nom, le smiley,
+         ajoute, modifie, supprime ou déplace les étapes. Les exemples de
+         départ sont là pour t'aider à commencer.</small></p>
+      <p><small>C'est pour toi : rien de tout cela ne va sur la carte de
+         l'écran verrouillé.</small></p>
+      <div id="r-emotions"></div>
+      <button type="button" id="r-emotions-defaut" style="margin-top:8px">Remettre les exemples de départ</button>
+    </div>
+
     <div class="carte">
       <h2>Mes déclencheurs</h2>
       <label for="r-declencheurs">Mes déclencheurs personnels, un par ligne</label>
@@ -485,9 +525,15 @@
          sauvegarde, rangé dans le téléphone, permet de tout retrouver.</small></p>
       <p><small>Il contient ton journal, tes liens, tes réglages et tout
          ton protocole : les cases cochées, tes propres lignes, la personne
-         à prévenir et le fond choisi pour la carte. Il contient donc aussi
+         à prévenir, le fond choisi pour la carte et tes procédures par
+         émotion. Il contient donc aussi
          des noms et des numéros de téléphone : garde-le en lieu sûr, c'est
          un fichier personnel.</small></p>
+      <p class="avis"><strong>Attention : les notes vocales du journal ne
+         sont pas dans la sauvegarde.</strong> Elles prendraient trop de
+         place. Le texte de chaque entrée est bien sauvegardé, mais si les
+         données de Refuge sont effacées ou si tu changes de téléphone, les
+         enregistrements de ta voix seront perdus.</p>
 
       <button type="button" id="btn-sauvegarder" class="bouton-doux" style="margin-bottom:12px">
         Enregistrer une sauvegarde
@@ -809,6 +855,38 @@
     <button type="button" id="monte-respirer" class="bouton-doux masque" style="margin-bottom:12px">Respirer avec moi</button>
     <button type="button" id="monte-bouclier" class="masque" style="margin-bottom:12px">Allumer le bouclier sensoriel</button>
     <button type="button" id="monte-fermer">Fermer</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     ÉCRAN PLEIN : CE QUE JE RESSENS (procédures par émotion)
+     Deux temps dans le même écran : d'abord les émotions en gros
+     smileys, puis, après un appui, les étapes à cocher. Lisible en
+     bouclier (lisible-en-bouclier), smileys passés en gris.
+     ============================================================ -->
+<div id="ecran-emotions" class="carte-sos defile lisible-en-bouclier" hidden tabindex="-1"
+     role="dialog" aria-modal="true" aria-labelledby="emotions-titre">
+
+  <div id="emotions-choix">
+    <h2 id="emotions-titre">Ce que je ressens</h2>
+    <p class="intro">Touche ce qui ressemble le plus à ce que tu ressens.
+       Tu y retrouveras ce que tu as prévu, au calme, pour ce moment-là.</p>
+    <div id="emotions-grille" class="grille-emotions"></div>
+  </div>
+
+  <div id="emotions-procedure" hidden>
+    <h2 id="procedure-titre"></h2>
+    <p class="intro">Coche au fur et à mesure, si ça t'aide. Rien n'est
+       obligatoire.</p>
+    <div id="procedure-etapes"></div>
+    <p id="procedure-vide" class="intro masque">Aucune étape pour
+       l'instant. Tu pourras en ajouter au calme, dans les Réglages.</p>
+    <button type="button" id="procedure-decocher" style="margin-top:16px">Tout décocher</button>
+    <button type="button" id="procedure-retour" class="bouton-doux" style="margin-top:12px">Choisir une autre émotion</button>
+  </div>
+
+  <div class="pied">
+    <button type="button" id="emotions-fermer">Fermer</button>
   </div>
 </div>
 

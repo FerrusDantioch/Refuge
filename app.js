@@ -2,10 +2,12 @@
    REFUGE — logique de l'application
    Écrit pour être relu : chaque bloc est commenté en français.
 
-   RÈGLE DE SILENCE : ce fichier n'appelle JAMAIS navigator.vibrate,
-   ne crée JAMAIS d'objet Audio, et ne demande JAMAIS l'autorisation
-   d'envoyer des notifications. L'application ne peut donc émettre
-   aucun son ni aucune vibration, par construction.
+   RÈGLE DE SILENCE : ce fichier n'appelle JAMAIS navigator.vibrate
+   et ne demande JAMAIS l'autorisation d'envoyer des notifications.
+   Une seule exception au silence, voulue et encadrée : la réécoute
+   d'une note vocale du journal (section 5 bis). Le lecteur n'est créé
+   QUE par un appui sur « Écouter », jamais en bouclier, et se tait dès
+   qu'on quitte le journal ou l'application. Aucun autre son, nulle part.
    ============================================================ */
 
 'use strict';
@@ -155,6 +157,10 @@ function activerBouclier(actif) {
   majEntreeMonte();
   if (actif && !$('#ecran-monte').hidden) ouvrirEcranMonte(false);
 
+  /* Notes vocales : les boutons disparaissent (CSS, classe « voix »),
+     la lecture se tait, un enregistrement en cours s'arrête et est gardé. */
+  if (actif) couperVoix('quand le bouclier s\'est allumé');
+
   majCouleurBarre();
   annoncer(actif
     ? 'Bouclier sensoriel activé. Écran noir, application silencieuse.'
@@ -190,6 +196,8 @@ function allerA(nom) {
 
   /* Par respect du calme : quitter l'onglet respiration arrête la séance. */
   if (nom !== 'respiration' && respiration.enCours) respiration.arreter();
+  /* Même chose pour une note vocale : quitter le journal la fait taire. */
+  if (nom !== 'journal') couperVoix('quand tu as quitté le journal');
   if (nom === 'journal') afficherCrises();
 }
 
@@ -694,7 +702,7 @@ const BDD = {
      ------------------------------------------------------------
      IndexedDB fonctionne par numéro de version. La v1 de Refuge ne
      connaissait qu'un seul tiroir : « crises ». La v2 en ajoute deux,
-     « protocole » et « liens ».
+     « protocole » et « liens ». La v3 ajoute « notesVocales ».
 
      La règle d'or est ici : on n'ouvre JAMAIS un tiroir existant pour
      le recréer. onupgradeneeded ne crée que ce qui manque
@@ -709,7 +717,7 @@ const BDD = {
 
   ouvrir() {
     return new Promise((resoudre, rejeter) => {
-      const demande = indexedDB.open('refuge', 2);
+      const demande = indexedDB.open('refuge', 3);
 
       demande.onupgradeneeded = () => {
         const b = demande.result;
@@ -730,6 +738,13 @@ const BDD = {
         /* v2 — les liens apaisants, numérotés automatiquement. */
         if (!b.objectStoreNames.contains('liens')) {
           b.createObjectStore('liens', { keyPath: 'id', autoIncrement: true });
+        }
+
+        /* v3 — les notes vocales du journal. Une note par entrée, rangée
+           sous le numéro (id) de l'entrée : pas de keyPath. L'entrée
+           elle-même, dans « crises », n'est pas modifiée. */
+        if (!b.objectStoreNames.contains('notesVocales')) {
+          b.createObjectStore('notesVocales');
         }
       };
 
@@ -762,7 +777,20 @@ const BDD = {
 
   /* --- Journal de crises (inchangé depuis la v1) --- */
   ajouter(entree) { return BDD.operation('crises', 'readwrite', (m) => m.add(entree)); },
-  supprimer(id)   { return BDD.operation('crises', 'readwrite', (m) => m.delete(id)); },
+  /* Supprimer une entrée supprime aussi sa note vocale, dans la même
+     transaction : jamais d'enregistrement orphelin. */
+  supprimer(id) {
+    return new Promise((resoudre, rejeter) => {
+      if (!BDD.base) { rejeter(new Error('Base locale indisponible')); return; }
+      try {
+        const t = BDD.base.transaction(['crises', 'notesVocales'], 'readwrite');
+        t.objectStore('crises').delete(id);
+        t.objectStore('notesVocales').delete(id);
+        t.oncomplete = () => resoudre();
+        t.onerror = () => rejeter(t.error);
+      } catch (e) { rejeter(e); }
+    });
+  },
   /* put() remplace l'entrée qui porte le même id : c'est ainsi qu'on
      complète une crise notée rapidement. Aucun changement de tiroir. */
   modifier(entree) { return BDD.operation('crises', 'readwrite', (m) => m.put(entree)); },
@@ -775,7 +803,22 @@ const BDD = {
   /* --- Liens apaisants --- */
   liensTout()        { return BDD.operation('liens', 'readonly',  (m) => m.getAll()); },
   liensAjouter(l)    { return BDD.operation('liens', 'readwrite', (m) => m.add(l)); },
-  liensSupprimer(id) { return BDD.operation('liens', 'readwrite', (m) => m.delete(id)); }
+  liensSupprimer(id) { return BDD.operation('liens', 'readwrite', (m) => m.delete(id)); },
+
+  /* --- Notes vocales : { audio (Blob), type, duree (secondes), ts } --- */
+  voixLire(id)          { return BDD.operation('notesVocales', 'readonly',  (m) => m.get(id)); },
+  voixEcrire(id, note)  { return BDD.operation('notesVocales', 'readwrite', (m) => m.put(note, id)); },
+  voixSupprimer(id)     { return BDD.operation('notesVocales', 'readwrite', (m) => m.delete(id)); },
+  /* La durée de chaque note, par numéro d'entrée, sans lire le son. */
+  voixDurees() {
+    const durees = new Map();
+    return BDD.operation('notesVocales', 'readonly', (m) => {
+      m.openCursor().onsuccess = (e) => {
+        const c = e.target.result;
+        if (c) { durees.set(c.key, c.value.duree); c.continue(); }
+      };
+    }).then(() => durees);
+  }
 };
 
 /* --- État du formulaire d'ajout --- */
@@ -784,6 +827,10 @@ const brouillon = { duree: null, intensite: null, declencheurs: [] };
 /* L'entrée qu'on complète ou qu'on modifie (son id), ou null pour une
    nouvelle entrée. */
 let criseEnEdition = null;
+
+/* Les entrées qui ont une note vocale : numéro → durée en secondes.
+   Relu à chaque affichage du journal (section 5 bis). */
+let dureesVoix = new Map();
 
 /* Gère les groupes de boutons à choix unique (durée, intensité). */
 function choixUnique(idGroupe, surChoix) {
@@ -904,6 +951,7 @@ function remplirFormulaire(entree) {
   construireDeclencheurs(Array.isArray(e.declencheurs) ? e.declencheurs : []);
   $('#f-autre-declencheur').value = '';
   $('#f-note').value = e.note || '';
+  preparerVoix(criseEnEdition);
 }
 
 function ouvrirFormulaire(ouvert, entree) {
@@ -917,6 +965,9 @@ function ouvrirFormulaire(ouvert, entree) {
     $('#f-date').focus({ preventScroll: true });
   } else {
     criseEnEdition = null;
+    /* « Annuler » : un enregistrement en cours ou pas encore rangé est
+       abandonné, la note déjà rangée reste telle quelle. */
+    preparerVoix(null);
   }
 }
 
@@ -930,9 +981,11 @@ function messageJournal(texte) {
   zone.classList.toggle('masque', !texte);
 }
 
-/* Une entrée « rapide » n'a que son heure : rien d'autre n'a été noté. */
+/* Une entrée « rapide » n'a que son heure : rien d'autre n'a été noté,
+   pas même une note vocale. */
 function estRapide(c) {
-  return !c.duree && !c.intensite && !(c.declencheurs && c.declencheurs.length) && !c.note;
+  return !c.duree && !c.intensite && !(c.declencheurs && c.declencheurs.length) && !c.note
+    && !dureesVoix.has(c.id);
 }
 
 /* Noter une crise en un seul appui : après une crise, l'énergie manque
@@ -956,6 +1009,9 @@ $('#btn-noter-vite').addEventListener('click', async () => {
 
 $('#form-crise').addEventListener('submit', async (e) => {
   e.preventDefault();
+  /* Un enregistrement encore en cours est arrêté et gardé. */
+  await arreterEnregistrement();
+  arreterLecture();
   const entree = {
     ts: new Date($('#f-date').value || maintenantLocal()).getTime(),
     duree: brouillon.duree,
@@ -965,8 +1021,37 @@ $('#form-crise').addEventListener('submit', async (e) => {
   };
   const enEdition = criseEnEdition;
   try {
+    let id = enEdition;
     if (enEdition !== null) await BDD.modifier({ ...entree, id: enEdition });
-    else await BDD.ajouter(entree);
+    else id = await BDD.ajouter(entree);
+
+    /* La note vocale, rangée à part sous le numéro de l'entrée. Si elle
+       ne passe pas (téléphone plein), le texte est déjà enregistré : le
+       formulaire reste ouvert sur cette entrée pour pouvoir réessayer. */
+    try {
+      if (voix.nouvelle) {
+        await BDD.voixEcrire(id, {
+          audio: voix.nouvelle.audio,
+          type: voix.nouvelle.type,
+          duree: voix.nouvelle.duree,
+          ts: Date.now()
+        });
+      } else if (voix.aSupprimer) {
+        await BDD.voixSupprimer(id);
+      }
+    } catch (err) {
+      console.error(err);
+      criseEnEdition = id;
+      $('#titre-form-crise').textContent = "Modifier l'entrée";
+      await afficherCrises();
+      const texte = "Le texte de l'entrée est enregistré, mais pas la note vocale : "
+        + 'le téléphone manque peut-être de place. Tu peux réessayer avec '
+        + '« Enregistrer », en bas, ou toucher « Annuler ».';
+      messageVoix(texte);
+      annoncer(texte);
+      return;
+    }
+
     ouvrirFormulaire(false);
     /* Remise à zéro du formulaire pour la prochaine fois. */
     remplirFormulaire(null);
@@ -993,6 +1078,11 @@ async function afficherCrises() {
   let liste = [];
   try { liste = await BDD.tout(); } catch (e) { console.error(e); }
   liste.sort((a, b) => b.ts - a.ts);   /* la plus récente en premier */
+  try { dureesVoix = await BDD.voixDurees(); } catch (e) { dureesVoix = new Map(); console.error(e); }
+
+  /* Les boutons de la liste vont être refaits : une écoute lancée
+     depuis la liste s'arrête. */
+  if (lecture.bouton && lecture.bouton.closest('#liste-crises')) arreterLecture();
 
   const conteneur = $('#liste-crises');
   $('#outils-journal').classList.toggle('masque', liste.length === 0);
@@ -1052,6 +1142,20 @@ async function afficherCrises() {
       bloc.appendChild(rapide);
     }
 
+    /* Note vocale : une ligne, puis « Écouter » et « Supprimer la note
+       vocale » avec les autres boutons. Tout disparaît en bouclier. */
+    const aVoix = dureesVoix.has(c.id);
+    const dureeVoix = dureesVoix.get(c.id) || 0;
+    let ligneVoix = null;
+    if (aVoix) {
+      ligneVoix = document.createElement('p');
+      ligneVoix.className = 'meta voix voix-temps';
+      const texteRepos = () => { ligneVoix.textContent = 'Note vocale : ' + dureeParlee(dureeVoix) + '.'; };
+      texteRepos();
+      ligneVoix.texteRepos = texteRepos;
+      bloc.appendChild(ligneVoix);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'actions-entree';
 
@@ -1062,6 +1166,51 @@ async function afficherCrises() {
     completer.setAttribute('aria-label', completer.textContent + " l'entrée du " + FORMAT_DATE.format(new Date(c.ts)));
     completer.addEventListener('click', () => ouvrirFormulaire(true, c));
     actions.appendChild(completer);
+
+    if (aVoix) {
+      const quand = FORMAT_DATE.format(new Date(c.ts));
+      const ecouterBtn = document.createElement('button');
+      ecouterBtn.type = 'button';
+      ecouterBtn.className = 'supprimer voix';
+      ecouterBtn.textContent = 'Écouter';
+      ecouterBtn.setAttribute('aria-label', 'Écouter la note vocale du ' + quand);
+      /* La lecture ne démarre que sur cet appui. */
+      ecouterBtn.addEventListener('click', async () => {
+        if (lecture.bouton === ecouterBtn) { arreterLecture(); annoncer('Écoute arrêtée.'); return; }
+        let note = null;
+        try { note = await BDD.voixLire(c.id); } catch (err) { console.error(err); }
+        if (!note || !note.audio) { messageJournal("La note vocale n'a pas pu être lue."); return; }
+        ecouter(note.audio, note.duree, ecouterBtn, ligneVoix, ligneVoix.texteRepos);
+      });
+      actions.appendChild(ecouterBtn);
+
+      const supVoix = document.createElement('button');
+      supVoix.type = 'button';
+      supVoix.className = 'supprimer voix';
+      supVoix.textContent = 'Supprimer la note vocale';
+      supVoix.setAttribute('aria-label', 'Supprimer la note vocale du ' + quand);
+      let armeVoix = false;
+      supVoix.addEventListener('click', async () => {
+        if (!armeVoix) {
+          armeVoix = true;
+          supVoix.textContent = 'Confirmer la suppression';
+          setTimeout(() => { armeVoix = false; supVoix.textContent = 'Supprimer la note vocale'; }, 4000);
+          return;
+        }
+        try {
+          await BDD.voixSupprimer(c.id);
+        } catch (err) {
+          console.error(err);
+          messageJournal("La note vocale n'a pas pu être supprimée.");
+          return;
+        }
+        /* Si cette entrée est ouverte dans le formulaire, il l'apprend. */
+        if (criseEnEdition === c.id) { voix.existante = null; voix.aSupprimer = false; majVoix(); }
+        await afficherCrises();
+        annoncer('Note vocale supprimée.');
+      });
+      actions.appendChild(supVoix);
+    }
 
     const sup = document.createElement('button');
     sup.type = 'button';
@@ -1152,6 +1301,342 @@ $('#btn-export-csv').addEventListener('click', async () => {
    fabriquée par enregistrerSauvegarde(), section 12 : le même fichier
    que le bouton des Réglages. */
 $('#btn-export-json').addEventListener('click', enregistrerSauvegarde);
+
+
+/* ============================================================
+   5 bis. NOTES VOCALES DU JOURNAL
+   ------------------------------------------------------------
+   Après une crise, parler peut être plus facile qu'écrire. Chaque
+   entrée peut donc porter une note vocale de 5 minutes au plus,
+   rangée dans le tiroir « notesVocales » sous le numéro de l'entrée.
+
+   Les garde-fous, tous voulus :
+     • rien ne démarre seul : le micro ne s'ouvre que sur « Enregistrer
+       ma voix », le son ne sort que sur « Écouter » ;
+     • le micro n'est demandé que là, dans le formulaire détaillé,
+       jamais dans « Noter une crise maintenant » (utilisé en crise) ;
+     • en bouclier, tout disparaît (CSS, classe « voix ») et ce qui
+       tourne s'arrête : l'enregistrement est gardé, la lecture coupée ;
+     • quitter le journal ou l'application coupe la lecture et arrête
+       l'enregistrement (ce qui a été dit est gardé) ;
+     • aucune transcription, rien n'est envoyé nulle part ;
+     • la sauvegarde JSON ne contient PAS l'audio (trop lourd) : c'est
+       écrit dans les Réglages et dans le journal.
+
+   Dans le formulaire, rien n'est écrit dans la base avant l'appui sur
+   « Enregistrer », en bas : « Annuler » laisse tout comme avant.
+   ============================================================ */
+
+const DUREE_MAX_VOIX = 5 * 60;   /* en secondes */
+
+/* Les formats, du préféré au moins bon : Chrome prend le premier,
+   Safari le format mp4. À 32 kbit/s, une voix reste claire et 5 minutes
+   tiennent dans environ 1,2 Mo. */
+const FORMATS_VOIX = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm'];
+
+const voix = {
+  existante: null,    /* durée de la note déjà rangée pour l'entrée modifiée, ou null */
+  nouvelle: null,     /* { audio, type, duree } : enregistrée, pas encore rangée */
+  aSupprimer: false,  /* la note rangée partira à l'appui sur « Enregistrer » */
+  enregistreur: null, /* le MediaRecorder pendant un enregistrement */
+  debut: 0,
+  minuteur: null,
+  limite: null,
+  jeter: false,       /* « Annuler » pendant l'enregistrement : rien n'est gardé */
+  finie: Promise.resolve(),
+  demandeEnCours: false
+};
+
+/* 75 → « 1:15 » */
+function minutesSecondes(s) {
+  s = Math.max(0, Math.floor(s));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+/* 75 → « 1 min 15 s » */
+function dureeParlee(s) {
+  s = Math.max(1, Math.round(s || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (!m) return r + ' s';
+  return r ? m + ' min ' + r + ' s' : m + ' min';
+}
+
+function messageVoix(texte) {
+  const zone = $('#voix-message');
+  zone.textContent = texte;
+  zone.classList.toggle('masque', !texte);
+}
+
+/* Met la zone « Note vocale » du formulaire d'accord avec l'état. */
+function majVoix() {
+  const enCours = !!voix.enregistreur;
+  const duree = voix.nouvelle ? voix.nouvelle.duree : (voix.aSupprimer ? null : voix.existante);
+  const aUneNote = duree !== null;
+  const etat = $('#voix-etat');
+  if (enCours) {
+    etat.textContent = 'Enregistrement en cours : '
+      + minutesSecondes((Date.now() - voix.debut) / 1000) + ' (5:00 au plus)';
+  } else if (voix.nouvelle) {
+    etat.textContent = 'Nouvelle note vocale de ' + dureeParlee(duree)
+      + '. Elle sera gardée quand tu toucheras « Enregistrer », en bas.';
+  } else if (aUneNote) {
+    etat.textContent = 'Note vocale de ' + dureeParlee(duree) + '.';
+  } else if (voix.aSupprimer) {
+    etat.textContent = 'La note vocale sera supprimée quand tu toucheras « Enregistrer », en bas.';
+  }
+  etat.classList.toggle('masque', !enCours && !aUneNote && !voix.aSupprimer);
+  $('#voix-enregistrer').classList.toggle('masque', enCours);
+  $('#voix-enregistrer').textContent = aUneNote ? 'Recommencer (remplace la note)' : 'Enregistrer ma voix';
+  $('#voix-arreter').classList.toggle('masque', !enCours);
+  $('#voix-actions').classList.toggle('masque', enCours || !aUneNote);
+}
+
+/* Remet la zone à zéro pour l'entrée qu'on ouvre (id), ou une nouvelle. */
+function preparerVoix(id) {
+  arreterEnregistrement(true);
+  arreterLecture();
+  voix.nouvelle = null;
+  voix.aSupprimer = false;
+  voix.existante = id !== null && dureesVoix.has(id) ? dureesVoix.get(id) || 0 : null;
+  messageVoix('');
+  majVoix();
+}
+
+/* Le refus du micro n'est pas une erreur de la personne : on le dit
+   simplement, avec l'autre chemin (écrire), et comment changer d'avis. */
+function texteErreurMicro(err) {
+  const nom = err && err.name;
+  if (nom === 'NotAllowedError' || nom === 'SecurityError' || nom === 'PermissionDeniedError') {
+    return "Refuge n'a pas accès au micro. Ce n'est pas grave : tu peux écrire ta note à la place. "
+      + 'Si tu changes d\'avis, autorise le micro pour Refuge dans les réglages de Chrome '
+      + '(Paramètres des sites, puis Micro).';
+  }
+  if (nom === 'NotFoundError' || nom === 'OverconstrainedError' || nom === 'DevicesNotFoundError') {
+    return "Aucun micro n'a été trouvé sur cet appareil. Tu peux écrire ta note à la place.";
+  }
+  if (nom === 'NotReadableError' || nom === 'TrackStartError' || nom === 'AbortError') {
+    return 'Le micro est déjà pris par une autre application (un appel, par exemple). '
+      + 'Ferme-la, puis réessaie.';
+  }
+  return "L'enregistrement n'a pas pu démarrer. Tu peux écrire ta note à la place.";
+}
+
+async function commencerEnregistrement() {
+  if (voix.enregistreur || voix.demandeEnCours || bouclierActif) return;
+  messageVoix('');
+  arreterLecture();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    messageVoix("Ce navigateur ne sait pas enregistrer le son. Tu peux écrire ta note à la place.");
+    return;
+  }
+
+  let flux;
+  voix.demandeEnCours = true;
+  try {
+    flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    messageVoix(texteErreurMicro(err));
+    annoncer('Micro indisponible.');
+    return;
+  } finally {
+    voix.demandeEnCours = false;
+  }
+
+  /* Pendant la question du téléphone, la personne a pu fermer le
+     formulaire, quitter Refuge ou allumer le bouclier : on n'enregistre
+     rien, et le micro est rendu tout de suite. */
+  if ($('#form-crise').classList.contains('masque') || bouclierActif || document.hidden) {
+    flux.getTracks().forEach((piste) => piste.stop());
+    return;
+  }
+
+  const format = (MediaRecorder.isTypeSupported && FORMATS_VOIX.find((f) => MediaRecorder.isTypeSupported(f))) || '';
+  let enregistreur;
+  try {
+    enregistreur = new MediaRecorder(flux, format
+      ? { mimeType: format, audioBitsPerSecond: 32000 }
+      : { audioBitsPerSecond: 32000 });
+  } catch (err) {
+    flux.getTracks().forEach((piste) => piste.stop());
+    messageVoix("L'enregistrement n'a pas pu démarrer. Tu peux écrire ta note à la place.");
+    return;
+  }
+
+  const morceaux = [];
+  voix.jeter = false;
+  enregistreur.ondataavailable = (e) => { if (e.data && e.data.size) morceaux.push(e.data); };
+  enregistreur.onerror = () => {
+    messageVoix("L'enregistrement s'est interrompu. Ce qui a été dit jusque-là est gardé.");
+  };
+  voix.finie = new Promise((fini) => {
+    enregistreur.onstop = () => {
+      /* Le micro est rendu : le voyant du téléphone s'éteint. */
+      flux.getTracks().forEach((piste) => piste.stop());
+      clearInterval(voix.minuteur);
+      clearTimeout(voix.limite);
+      const duree = Math.min(DUREE_MAX_VOIX, Math.max(1, Math.round((Date.now() - voix.debut) / 1000)));
+      voix.enregistreur = null;
+      const garde = !voix.jeter && morceaux.length > 0;
+      if (garde) {
+        const type = enregistreur.mimeType || format || 'audio/webm';
+        voix.nouvelle = { audio: new Blob(morceaux, { type: type }), type: type, duree: duree };
+        voix.aSupprimer = false;
+      } else if (!voix.jeter) {
+        /* Arrêté trop vite : le micro n'avait encore rien capté. */
+        messageVoix("Rien n'a été enregistré : c'était trop court. Tu peux réessayer.");
+      }
+      const avaitLeFocus = document.activeElement === $('#voix-arreter');
+      majVoix();
+      if (avaitLeFocus && !voix.jeter) $(garde ? '#voix-ecouter' : '#voix-enregistrer').focus();
+      fini();
+    };
+  });
+
+  voix.enregistreur = enregistreur;
+  voix.debut = Date.now();
+  enregistreur.start(1000);   /* un morceau par seconde : rien n'est perdu si ça s'arrête */
+  /* Le temps écoulé change une fois par seconde, sans clignoter. */
+  voix.minuteur = setInterval(majVoix, 1000);
+  voix.limite = setTimeout(() => {
+    arreterEnregistrement();
+    messageVoix("5 minutes atteintes : l'enregistrement s'est arrêté tout seul. Il est gardé.");
+    annoncer('Enregistrement arrêté au bout de 5 minutes.');
+  }, DUREE_MAX_VOIX * 1000);
+  majVoix();
+  $('#voix-arreter').focus();
+  annoncer('Enregistrement commencé.');
+}
+
+/* Arrête l'enregistrement en cours ; « jeter » : ne rien garder.
+   La promesse se résout quand la note est vraiment prête. */
+function arreterEnregistrement(jeter) {
+  if (!voix.enregistreur) return voix.finie;
+  if (jeter) voix.jeter = true;
+  clearInterval(voix.minuteur);
+  clearTimeout(voix.limite);
+  if (voix.enregistreur.state !== 'inactive') voix.enregistreur.stop();
+  return voix.finie;
+}
+
+/* --- Lecture ---
+   Un seul lecteur à la fois. Il n'est créé QUE par un appui sur un
+   bouton « Écouter » : c'est la seule source de son de toute
+   l'application. Un deuxième appui sur le même bouton l'arrête. */
+const lecture = { element: null, url: null, bouton: null, texte: '', aria: null, apresArret: null };
+
+function arreterLecture() {
+  if (!lecture.element) return;
+  lecture.element.pause();
+  lecture.element.removeAttribute('src');
+  lecture.element.load();   /* le fichier est relâché */
+  URL.revokeObjectURL(lecture.url);
+  const { bouton, texte, aria, apresArret } = lecture;
+  lecture.element = lecture.url = lecture.bouton = lecture.apresArret = null;
+  bouton.textContent = texte;
+  if (aria) bouton.setAttribute('aria-label', aria);
+  if (apresArret) apresArret();
+}
+
+/* audio : le Blob ; duree : en secondes ; temps : le texte où afficher
+   l'avancée ; apresArret : remet ce texte comme avant. */
+function ecouter(audio, duree, bouton, temps, apresArret) {
+  if (lecture.bouton === bouton) {
+    arreterLecture();
+    annoncer('Écoute arrêtée.');
+    return;
+  }
+  arreterLecture();
+  if (bouclierActif || !audio) return;
+
+  const el = document.createElement('audio');
+  lecture.element = el;
+  lecture.url = URL.createObjectURL(audio);
+  lecture.bouton = bouton;
+  lecture.texte = bouton.textContent;
+  lecture.aria = bouton.getAttribute('aria-label');
+  lecture.apresArret = apresArret;
+  bouton.textContent = "Arrêter l'écoute";
+  if (lecture.aria) bouton.setAttribute('aria-label', "Arrêter l'écoute");
+  temps.textContent = 'Écoute : 0:00 sur ' + minutesSecondes(duree);
+
+  el.addEventListener('timeupdate', () => {
+    if (lecture.element === el) {
+      temps.textContent = 'Écoute : ' + minutesSecondes(el.currentTime) + ' sur ' + minutesSecondes(duree);
+    }
+  });
+  el.addEventListener('ended', () => { if (lecture.element === el) arreterLecture(); });
+  el.src = lecture.url;
+  el.play().catch((err) => {
+    if (lecture.element !== el) return;
+    console.error(err);
+    arreterLecture();
+    const texteErreur = "La note vocale n'a pas pu être lue sur ce téléphone.";
+    if (bouton.closest('#form-crise')) messageVoix(texteErreur); else messageJournal(texteErreur);
+    annoncer(texteErreur);
+  });
+}
+
+/* Quitter le journal, quitter Refuge, allumer le bouclier : la lecture
+   se tait, l'enregistrement s'arrête mais reste gardé. */
+function couperVoix(raison) {
+  arreterLecture();
+  if (!voix.enregistreur) return;
+  arreterEnregistrement();
+  messageVoix("L'enregistrement s'est arrêté " + raison + '. Ce qui a été dit est gardé.');
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) couperVoix('quand tu as quitté Refuge');
+});
+
+/* --- Boutons du formulaire --- */
+
+$('#voix-enregistrer').addEventListener('click', commencerEnregistrement);
+
+$('#voix-arreter').addEventListener('click', async () => {
+  await arreterEnregistrement();
+  if (voix.nouvelle) annoncer('Enregistrement arrêté : ' + dureeParlee(voix.nouvelle.duree) + '.');
+});
+
+$('#voix-ecouter').addEventListener('click', async (e) => {
+  const bouton = e.currentTarget;
+  if (lecture.bouton === bouton) { arreterLecture(); annoncer('Écoute arrêtée.'); return; }
+  messageVoix('');
+  let note = voix.nouvelle;
+  if (!note && criseEnEdition !== null) {
+    try { note = await BDD.voixLire(criseEnEdition); } catch (err) { console.error(err); }
+  }
+  if (!note || !note.audio) {
+    messageVoix("La note vocale n'a pas pu être lue.");
+    return;
+  }
+  ecouter(note.audio, note.duree, bouton, $('#voix-etat'), majVoix);
+});
+
+/* Deux appuis, comme partout ailleurs : on ne perd jamais une note par
+   accident. */
+let effacerVoixArme = null;
+$('#voix-effacer').addEventListener('click', (e) => {
+  const b = e.currentTarget;
+  if (!effacerVoixArme) {
+    b.textContent = 'Confirmer la suppression';
+    effacerVoixArme = setTimeout(() => { effacerVoixArme = null; b.textContent = 'Supprimer la note'; }, 4000);
+    return;
+  }
+  clearTimeout(effacerVoixArme);
+  effacerVoixArme = null;
+  b.textContent = 'Supprimer la note';
+  arreterLecture();
+  voix.nouvelle = null;
+  if (voix.existante !== null) voix.aSupprimer = true;
+  messageVoix('');
+  majVoix();
+  $('#voix-enregistrer').focus();
+  annoncer(voix.aSupprimer
+    ? 'La note vocale sera supprimée quand tu enregistreras l\'entrée.'
+    : 'Note vocale supprimée.');
+});
 
 
 /* ============================================================
@@ -1703,14 +2188,103 @@ const THEMES_MONTEE = [
   }
 ];
 
+/* ------------------------------------------------------------
+   PROCÉDURES PAR ÉMOTION — les exemples de départ
+   ------------------------------------------------------------
+   Cinq émotions, chacune avec quelques étapes d'exemple. Contrairement
+   au protocole, TOUT ici appartient ensuite à la personne : elle change
+   les noms, les smileys et les étapes dans les Réglages. Ces exemples ne
+   servent qu'au premier démarrage, et au bouton « Remettre les exemples
+   de départ ».
+
+   Les noms sont des noms (« Colère ») plutôt que des adjectifs
+   (« en colère », « épuisé ») : ils conviennent à tout le monde, sans
+   accord au masculin ou au féminin.
+
+   Mêmes règles d'écriture que « Quand ça monte » : des étapes pour soi,
+   à l'infinitif ou à la première personne, de l'information et jamais
+   une consigne médicale. Pour soi seulement : rien de tout cela ne doit
+   entrer dans lignesProtocole() ni sur la carte.
+   Les « id » (émotions et étapes) retiennent les cases cochées : ne pas
+   modifier ceux qui sont déjà publiés.
+   ------------------------------------------------------------ */
+
+const EMOTIONS_DEFAUT = [
+  {
+    id: 'anxiete', nom: 'Anxiété', smiley: '😟',
+    etapes: [
+      'Aller dans un endroit calme, dos au mur',
+      'Respirer avec Refuge, quelques minutes',
+      'Poser les pieds bien à plat et sentir le sol',
+      'Nommer cinq choses que je vois autour de moi',
+      "Prévenir quelqu'un de confiance"
+    ]
+  },
+  {
+    id: 'surcharge', nom: 'Surcharge', smiley: '😖',
+    etapes: [
+      "Mettre mon casque ou mes bouchons d'oreilles",
+      'Mettre mes lunettes de soleil, ou fermer les yeux',
+      "M'éloigner du bruit et de la foule",
+      'Allumer le bouclier sensoriel',
+      "Ne rien décider pour l'instant"
+    ]
+  },
+  {
+    id: 'colere', nom: 'Colère', smiley: '😠',
+    etapes: [
+      "M'éloigner de la situation, sans me justifier",
+      'Serrer fort un coussin ou un objet dans les mains',
+      "Boire un verre d'eau fraîche",
+      'Marcher, bouger, me balancer',
+      'Attendre avant de répondre à qui que ce soit'
+    ]
+  },
+  {
+    id: 'tristesse', nom: 'Tristesse', smiley: '😢',
+    etapes: [
+      "M'envelopper dans une couverture lourde",
+      'Prendre mon objet réconfortant',
+      "Regarder ou écouter quelque chose qui m'apaise",
+      'Noter ce que je ressens dans le journal, si je veux',
+      "Envoyer un message à quelqu'un de confiance"
+    ]
+  },
+  {
+    id: 'epuisement', nom: 'Épuisement', smiley: '😩',
+    etapes: [
+      "M'allonger au calme, dans la pénombre",
+      'Annuler ce qui peut attendre',
+      'Boire et manger quelque chose de simple',
+      "Ne plus parler pour l'instant",
+      'Me reposer sans écran'
+    ]
+  }
+];
+
+/* Une copie neuve des exemples, au format rangé dans le protocole :
+   chaque étape reçoit un id stable (« anxiete-1 », « anxiete-2 »…). */
+function emotionsDefaut() {
+  return EMOTIONS_DEFAUT.map((e) => ({
+    id: e.id,
+    nom: e.nom,
+    smiley: e.smiley,
+    etapes: e.etapes.map((texte, i) => ({ id: e.id + '-' + (i + 1), texte: texte }))
+  }));
+}
+
 const monteVide = () => ({ coches: [], libres: {} });
 
 /* Ce que Refuge retient de vos choix. « coches » est une liste d'id,
    « libres » vos propres lignes, thème par thème, et « fond » le fond
    choisi pour la carte image (voir section 10) : 'sombre' ou 'clair'.
    « monte » garde la partie « Quand je sens que ça monte », sur le même
-   modèle (coches et lignes libres). */
-let protocole = { coches: [], libres: {}, contactNom: '', contactTel: '', fond: 'sombre', monte: monteVide() };
+   modèle (coches et lignes libres). « emotions » garde les procédures
+   par émotion (section 9 bis). */
+let protocole = {
+  coches: [], libres: {}, contactNom: '', contactTel: '', fond: 'sombre',
+  monte: monteVide(), emotions: emotionsDefaut()
+};
 
 /* L'écriture dans la base est différée de quelques centièmes de seconde :
    taper dans un champ libre déclencherait sinon une écriture par lettre. */
@@ -1811,6 +2385,7 @@ function afficherProtocole() {
   });
   majResumeProtocole();
   afficherMonte();
+  construireReglagesEmotions();
 }
 
 /* Les lignes libres d'un thème, nettoyées : une par ligne, sans vide. */
@@ -2051,13 +2626,479 @@ function initProtocole() {
           contactNom: enregistre.contactNom || '',
           contactTel: enregistre.contactTel || '',
           fond: enregistre.fond === 'clair' ? 'clair' : 'sombre',
-          monte: nettoyerMonte(enregistre.monte) || monteVide()
+          monte: nettoyerMonte(enregistre.monte) || monteVide(),
+          /* Absent (protocole enregistré avant cette version) : les
+             exemples de départ. */
+          emotions: nettoyerEmotions(enregistre.emotions) || emotionsDefaut()
         };
       }
       afficherProtocole();
     })
     .catch((e) => { console.warn('Protocole illisible.', e); afficherProtocole(); });
 }
+
+
+/* ============================================================
+   9 bis. PROCÉDURES PAR ÉMOTION
+   ------------------------------------------------------------
+   Rangées DANS le protocole (protocole.emotions), comme « Quand ça
+   monte » : même écriture (enregistrerProtocole), même tiroir, et donc
+   la même sauvegarde JSON, sans rien de plus à faire. Les exemples de
+   départ (EMOTIONS_DEFAUT) sont plus haut, en section 9.
+
+   Une émotion : { id, nom, smiley, etapes: [{ id, texte }] }.
+
+   Les cases cochées pendant une crise ne sont PAS dans le protocole :
+   elles ne servent que le temps de la crise. Elles sont gardées à part
+   (localStorage), pour survivre si le téléphone ferme Refuge pendant
+   qu'on envoie un SMS. Elles restent cochées toute la journée en cours,
+   sauf si la personne les décoche, et repartent à zéro le lendemain
+   (minuit, heure du téléphone). Elles ne partent pas dans la sauvegarde.
+   ============================================================ */
+
+const MAX_EMOTIONS = 10;
+const MAX_ETAPES = 30;
+
+/* Les smileys proposés dans les Réglages : des visages simples, connus
+   de tous les téléphones (rien de récent qui s'afficherait en carré). */
+const SMILEYS_PROPOSES = ['😟', '😰', '😖', '😣', '😠', '😤', '😢', '😞', '😩', '😴', '😶', '😐'];
+
+/* Un identifiant unique pour une étape ajoutée par la personne. */
+const nouvelId = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+/* Coupe un texte à n caractères sans casser un smiley en deux. */
+const couper = (texte, n) => Array.from(texte).slice(0, n).join('');
+
+/* Vérifie ce qui vient de la base ou d'un fichier de sauvegarde, champ
+   par champ. null si absent ou inutilisable : l'appelant garde alors ce
+   qu'il a déjà (c'est le cas des sauvegardes d'avant cette version). */
+function nettoyerEmotions(liste) {
+  if (!Array.isArray(liste)) return null;
+  const idsVus = new Set();
+  const unique = (id) => {
+    const propre = typeof id === 'string' && id ? id.slice(0, 60) : nouvelId();
+    const final = idsVus.has(propre) ? nouvelId() : propre;
+    idsVus.add(final);
+    return final;
+  };
+  const propres = liste
+    .filter((e) => e && typeof e === 'object')
+    .slice(0, MAX_EMOTIONS)
+    .map((e, i) => {
+      const defaut = EMOTIONS_DEFAUT[i % EMOTIONS_DEFAUT.length];
+      const smiley = typeof e.smiley === 'string' ? couper(e.smiley.trim(), 8) : '';
+      return {
+        id: unique(e.id),
+        nom: typeof e.nom === 'string' ? couper(e.nom, 40) : '',
+        smiley: smiley || defaut.smiley,
+        etapes: (Array.isArray(e.etapes) ? e.etapes : [])
+          .filter((x) => x && typeof x === 'object' && typeof x.texte === 'string')
+          .slice(0, MAX_ETAPES)
+          .map((x) => ({ id: unique(x.id), texte: couper(x.texte, 200) }))
+      };
+    });
+  return propres.length ? propres : null;
+}
+
+const nomEmotion = (e, i) => (e.nom || '').trim() || 'Émotion ' + (i + 1);
+/* Une étape vidée dans les Réglages n'apparaît pas pendant la crise. */
+const etapesRemplies = (e) => e.etapes.filter((x) => x.texte.trim());
+
+/* Deux appuis volontaires, comme partout dans Refuge : le premier change
+   le texte du bouton, le second (dans les 4 secondes) agit. */
+function deuxAppuis(bouton, texteConfirmer, action) {
+  let arme = null;
+  const texte = bouton.textContent;
+  const aria = bouton.getAttribute('aria-label');
+  const remettre = () => {
+    arme = null;
+    bouton.textContent = texte;
+    if (aria) bouton.setAttribute('aria-label', aria);
+  };
+  bouton.addEventListener('click', () => {
+    if (!arme) {
+      bouton.textContent = texteConfirmer;
+      if (aria) bouton.removeAttribute('aria-label');
+      arme = setTimeout(remettre, 4000);
+      return;
+    }
+    clearTimeout(arme);
+    remettre();
+    action();
+  });
+}
+
+/* --- Les cases cochées pendant la crise --- */
+
+const CLE_COCHES_EMOTIONS = 'refuge.emotionsCoches';
+
+/* La date du jour sur le téléphone, par exemple « 2026-10-29 ». */
+const aujourdhui = () => maintenantLocal().slice(0, 10);
+
+/* { idEmotion: [idEtape, …] }, ou {} si rien, ou si c'était un autre jour. */
+function lireCochesEmotions() {
+  try {
+    const d = JSON.parse(localStorage.getItem(CLE_COCHES_EMOTIONS));
+    if (d && d.coches && typeof d.coches === 'object' && d.jour === aujourdhui()) return d.coches;
+  } catch (e) { /* rien */ }
+  return {};
+}
+
+function ecrireCochesEmotions(coches) {
+  try {
+    localStorage.setItem(CLE_COCHES_EMOTIONS, JSON.stringify({ jour: aujourdhui(), coches: coches }));
+  } catch (e) { /* rien : les cases restent cochées à l'écran */ }
+}
+
+/* --- L'écran plein « Ce que je ressens » --- */
+
+let emotionOuverte = null;   /* l'id de l'émotion affichée, ou null */
+
+function ouvrirEcranEmotions(ouvert) {
+  const ecran = $('#ecran-emotions');
+  ecran.hidden = !ouvert;
+  if (!ouvert) {
+    emotionOuverte = null;
+    if ($('#btn-emotions').offsetParent) $('#btn-emotions').focus();
+    return;
+  }
+  montrerChoixEmotions();
+  ecran.focus({ preventScroll: true });
+  annoncer('Ce que je ressens.');
+}
+
+/* Premier temps : les émotions, en gros smileys. */
+function montrerChoixEmotions() {
+  emotionOuverte = null;
+  const grille = $('#emotions-grille');
+  grille.innerHTML = '';
+  protocole.emotions.forEach((emotion, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const smiley = document.createElement('span');
+    smiley.className = 'smiley';
+    smiley.setAttribute('aria-hidden', 'true');
+    smiley.textContent = emotion.smiley;
+    const nom = document.createElement('span');
+    nom.textContent = nomEmotion(emotion, i);
+    b.append(smiley, nom);
+    b.addEventListener('click', () => montrerProcedure(emotion.id));
+    grille.appendChild(b);
+  });
+  $('#emotions-choix').hidden = false;
+  $('#emotions-procedure').hidden = true;
+  const ecran = $('#ecran-emotions');
+  ecran.setAttribute('aria-labelledby', 'emotions-titre');
+  ecran.scrollTop = 0;
+}
+
+/* Second temps : les étapes de l'émotion touchée, à cocher. */
+function montrerProcedure(id) {
+  const i = protocole.emotions.findIndex((e) => e.id === id);
+  if (i === -1) { montrerChoixEmotions(); return; }
+  const emotion = protocole.emotions[i];
+  emotionOuverte = id;
+
+  const titre = $('#procedure-titre');
+  titre.innerHTML = '';
+  const smiley = document.createElement('span');
+  smiley.className = 'smiley';
+  smiley.setAttribute('aria-hidden', 'true');
+  smiley.textContent = emotion.smiley;
+  titre.append(smiley, document.createTextNode(nomEmotion(emotion, i)));
+
+  const faites = lireCochesEmotions()[id] || [];
+  const etapes = etapesRemplies(emotion);
+  const zone = $('#procedure-etapes');
+  zone.innerHTML = '';
+  etapes.forEach((etape, n) => {
+    const ligne = document.createElement('label');
+    ligne.className = 'proposition';
+    ligne.setAttribute('for', 'procedure-' + n);
+    const coche = document.createElement('input');
+    coche.type = 'checkbox';
+    coche.id = 'procedure-' + n;
+    coche.checked = faites.includes(etape.id);
+    coche.addEventListener('change', () => {
+      const toutes = lireCochesEmotions();
+      const liste = (toutes[id] || []).filter((x) => x !== etape.id);
+      if (coche.checked) liste.push(etape.id);
+      toutes[id] = liste;
+      ecrireCochesEmotions(toutes);
+    });
+    const texte = document.createElement('span');
+    texte.textContent = etape.texte;
+    ligne.append(coche, texte);
+    zone.appendChild(ligne);
+  });
+  $('#procedure-vide').classList.toggle('masque', etapes.length > 0);
+  $('#procedure-decocher').classList.toggle('masque', etapes.length === 0);
+
+  $('#emotions-choix').hidden = true;
+  $('#emotions-procedure').hidden = false;
+  const ecran = $('#ecran-emotions');
+  ecran.setAttribute('aria-labelledby', 'procedure-titre');
+  ecran.scrollTop = 0;
+  ecran.focus({ preventScroll: true });
+  annoncer(nomEmotion(emotion, i) + '. ' + etapes.length
+    + (etapes.length > 1 ? ' étapes.' : ' étape.'));
+}
+
+$('#btn-emotions').addEventListener('click', () => ouvrirEcranEmotions(true));
+$('#emotions-fermer').addEventListener('click', () => ouvrirEcranEmotions(false));
+$('#procedure-retour').addEventListener('click', () => {
+  montrerChoixEmotions();
+  $('#ecran-emotions').focus({ preventScroll: true });
+  annoncer('Choisis une émotion.');
+});
+deuxAppuis($('#procedure-decocher'), 'Confirmer : tout décocher', () => {
+  const toutes = lireCochesEmotions();
+  delete toutes[emotionOuverte];
+  ecrireCochesEmotions(toutes);
+  montrerProcedure(emotionOuverte);
+  annoncer('Tout est décoché.');
+});
+
+/* --- Les Réglages : une carte dépliable par émotion --- */
+
+function construireReglagesEmotions() {
+  const zone = $('#r-emotions');
+  /* Les encadrés ouverts le restent quand on reconstruit. */
+  const ouverts = new Set($$('#r-emotions details[open]').map((d) => d.dataset.id));
+  zone.innerHTML = '';
+  protocole.emotions.forEach((emotion, i) => {
+    zone.appendChild(carteReglageEmotion(emotion, i, ouverts.has(emotion.id)));
+  });
+}
+
+function carteReglageEmotion(emotion, i, ouvert) {
+  const details = document.createElement('details');
+  details.className = 'emotion-reglage';
+  details.dataset.id = emotion.id;
+  details.open = ouvert;
+
+  const resume = document.createElement('summary');
+  const majResume = () => {
+    resume.innerHTML = '';
+    const smiley = document.createElement('span');
+    smiley.className = 'smiley-petit';
+    smiley.setAttribute('aria-hidden', 'true');
+    smiley.textContent = emotion.smiley;
+    const nom = document.createElement('span');
+    nom.textContent = nomEmotion(emotion, i);
+    const total = etapesRemplies(emotion).length;
+    const compte = document.createElement('small');
+    compte.textContent = total + (total > 1 ? ' étapes' : ' étape');
+    resume.append(smiley, nom, compte);
+  };
+  majResume();
+  details.appendChild(resume);
+
+  const dedans = document.createElement('div');
+  dedans.className = 'dedans';
+  details.appendChild(dedans);
+  const base = 'emo-' + emotion.id;
+
+  /* Le nom */
+  const etiquetteNom = document.createElement('label');
+  etiquetteNom.setAttribute('for', base + '-nom');
+  etiquetteNom.textContent = 'Nom';
+  const champNom = document.createElement('input');
+  champNom.type = 'text';
+  champNom.id = base + '-nom';
+  champNom.maxLength = 40;
+  champNom.value = emotion.nom;
+  champNom.addEventListener('input', () => {
+    emotion.nom = champNom.value;
+    enregistrerProtocole();
+    majResume();
+  });
+  dedans.append(etiquetteNom, champNom);
+
+  /* Le smiley : un choix de visages, ou n'importe lequel tapé au clavier. */
+  const titreSmiley = document.createElement('p');
+  titreSmiley.className = 'etiquette';
+  titreSmiley.id = base + '-smiley-titre';
+  titreSmiley.textContent = 'Smiley';
+  const choix = document.createElement('div');
+  choix.className = 'choix-smiley';
+  choix.setAttribute('role', 'group');
+  choix.setAttribute('aria-labelledby', titreSmiley.id);
+  const champSmiley = document.createElement('input');
+  const majChoix = () => {
+    Array.from(choix.children).forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.smiley === emotion.smiley));
+    });
+  };
+  SMILEYS_PROPOSES.forEach((s) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'smiley-petit';
+    b.dataset.smiley = s;
+    b.textContent = s;
+    b.addEventListener('click', () => {
+      emotion.smiley = s;
+      champSmiley.value = '';
+      majChoix();
+      majResume();
+      enregistrerProtocole(true);
+    });
+    choix.appendChild(b);
+  });
+  majChoix();
+
+  const etiquetteSmiley = document.createElement('label');
+  etiquetteSmiley.setAttribute('for', base + '-smiley');
+  etiquetteSmiley.textContent = 'Ou un autre smiley, tapé au clavier';
+  champSmiley.type = 'text';
+  champSmiley.id = base + '-smiley';
+  champSmiley.value = SMILEYS_PROPOSES.includes(emotion.smiley) ? '' : emotion.smiley;
+  champSmiley.placeholder = 'Facultatif';
+  champSmiley.addEventListener('input', () => {
+    const s = couper(champSmiley.value.trim(), 8);
+    if (!s) return;   /* un champ vidé garde le smiley d'avant */
+    emotion.smiley = s;
+    majChoix();
+    majResume();
+    enregistrerProtocole();
+  });
+  dedans.append(titreSmiley, choix, etiquetteSmiley, champSmiley);
+
+  /* Les étapes */
+  const titreEtapes = document.createElement('p');
+  titreEtapes.className = 'etiquette';
+  titreEtapes.textContent = "Les étapes, dans l'ordre";
+  const liste = document.createElement('div');
+  dedans.append(titreEtapes, liste);
+
+  /* Redessine la liste. « focus » : [id de l'étape, action] du bouton à
+     qui rendre la main, pour ne pas perdre sa place après un déplacement. */
+  const dessinerEtapes = (focus) => {
+    liste.innerHTML = '';
+    if (!emotion.etapes.length) {
+      const vide = document.createElement('p');
+      vide.innerHTML = '<small>Aucune étape pour l\'instant.</small>';
+      liste.appendChild(vide);
+    }
+    emotion.etapes.forEach((etape, n) => {
+      const bloc = document.createElement('div');
+      bloc.className = 'etape-reglage';
+
+      const etiquette = document.createElement('label');
+      etiquette.setAttribute('for', base + '-etape-' + etape.id);
+      etiquette.textContent = 'Étape ' + (n + 1);
+      /* Une zone de deux lignes plutôt qu'un champ d'une ligne : une
+         étape longue se lit en entier. Une étape reste une seule ligne :
+         les retours à la ligne deviennent des espaces. */
+      const champ = document.createElement('textarea');
+      champ.id = base + '-etape-' + etape.id;
+      champ.rows = 2;
+      champ.maxLength = 200;
+      champ.value = etape.texte;
+      champ.addEventListener('input', () => {
+        if (champ.value.includes('\n')) champ.value = champ.value.replace(/\n+/g, ' ');
+        etape.texte = champ.value;
+        enregistrerProtocole();
+        majResume();
+      });
+
+      const rangee = document.createElement('div');
+      rangee.className = 'bouton-rangee';
+      const bouton = (texte, action, aria) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = texte;
+        b.dataset.etape = etape.id;
+        b.dataset.action = action;
+        b.setAttribute('aria-label', aria + ' ' + (n + 1));
+        rangee.appendChild(b);
+        return b;
+      };
+      const monter = bouton('Monter', 'monter', "Monter l'étape");
+      const descendre = bouton('Descendre', 'descendre', "Descendre l'étape");
+      const supprimer = bouton('Supprimer', 'supprimer', "Supprimer l'étape");
+      monter.disabled = n === 0;
+      descendre.disabled = n === emotion.etapes.length - 1;
+
+      const deplacer = (sens) => {
+        const cible = n + sens;
+        [emotion.etapes[n], emotion.etapes[cible]] = [emotion.etapes[cible], emotion.etapes[n]];
+        enregistrerProtocole(true);
+        /* Le bouton suit l'étape ; s'il est devenu inutilisable (arrivée
+           en haut ou en bas), on passe à l'autre. */
+        const bord = sens < 0 ? cible === 0 : cible === emotion.etapes.length - 1;
+        const action = sens < 0 ? (bord ? 'descendre' : 'monter') : (bord ? 'monter' : 'descendre');
+        dessinerEtapes([etape.id, action]);
+        annoncer('Étape déplacée en position ' + (cible + 1) + '.');
+      };
+      monter.addEventListener('click', () => deplacer(-1));
+      descendre.addEventListener('click', () => deplacer(1));
+      deuxAppuis(supprimer, 'Confirmer', () => {
+        emotion.etapes.splice(n, 1);
+        enregistrerProtocole(true);
+        majResume();
+        const suivante = emotion.etapes[Math.min(n, emotion.etapes.length - 1)];
+        dessinerEtapes(suivante ? [suivante.id, 'supprimer'] : null);
+        if (!suivante) champAjout.focus();
+        annoncer('Étape supprimée.');
+      });
+
+      bloc.append(etiquette, champ, rangee);
+      liste.appendChild(bloc);
+    });
+    if (focus) {
+      const b = liste.querySelector('button[data-etape="' + focus[0] + '"][data-action="' + focus[1] + '"]');
+      if (b && !b.disabled) b.focus();
+    }
+    const plein = emotion.etapes.length >= MAX_ETAPES;
+    champAjout.disabled = plein;
+    boutonAjout.disabled = plein;
+    champAjout.placeholder = plein ? MAX_ETAPES + ' étapes au plus' : 'Une nouvelle étape';
+  };
+
+  /* Ajouter une étape, à la fin */
+  const etiquetteAjout = document.createElement('label');
+  etiquetteAjout.setAttribute('for', base + '-ajout');
+  etiquetteAjout.textContent = 'Ajouter une étape';
+  etiquetteAjout.style.marginTop = '14px';
+  const ligneAjout = document.createElement('div');
+  ligneAjout.className = 'ajout-ligne';
+  const champAjout = document.createElement('input');
+  champAjout.type = 'text';
+  champAjout.id = base + '-ajout';
+  champAjout.maxLength = 200;
+  const boutonAjout = document.createElement('button');
+  boutonAjout.type = 'button';
+  boutonAjout.textContent = 'Ajouter';
+  const ajouter = () => {
+    const texte = champAjout.value.trim();
+    if (!texte) { champAjout.focus(); return; }
+    if (emotion.etapes.length >= MAX_ETAPES) return;
+    emotion.etapes.push({ id: nouvelId(), texte: texte });
+    enregistrerProtocole(true);
+    champAjout.value = '';
+    dessinerEtapes();
+    majResume();
+    champAjout.focus();
+    annoncer('Étape ajoutée : ' + texte);
+  };
+  boutonAjout.addEventListener('click', ajouter);
+  champAjout.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); ajouter(); }
+  });
+  ligneAjout.append(champAjout, boutonAjout);
+  dedans.append(etiquetteAjout, ligneAjout);
+
+  dessinerEtapes();
+  return details;
+}
+
+deuxAppuis($('#r-emotions-defaut'), 'Confirmer : remplacer mes émotions par les exemples', () => {
+  protocole.emotions = emotionsDefaut();
+  enregistrerProtocole(true);
+  construireReglagesEmotions();
+  annoncer('Les exemples de départ sont remis.');
+});
 
 
 /* ============================================================
@@ -2613,6 +3654,12 @@ async function enregistrerSauvegarde() {
     return;
   }
 
+  /* Les notes vocales ne partent PAS dans le fichier : trop lourdes.
+     Elles vivent dans leur propre tiroir, qu'on ne lit pas ici ; on les
+     compte seulement, pour prévenir la personne. */
+  let nbVoix = 0;
+  try { nbVoix = (await BDD.voixDurees()).size; } catch (e) { /* rien */ }
+
   const donnees = {
     app: 'refuge',
     version: 3,
@@ -2630,9 +3677,15 @@ async function enregistrerSauvegarde() {
 
   try { localStorage.setItem(CLE_DERNIERE_SAUVEGARDE, String(Date.now())); } catch (e) { /* rien */ }
   afficherDerniereSauvegarde();
-  messageSauvegarde('Fichier « ' + nom + ' » créé dans tes Téléchargements. '
-    + 'Tu peux aussi le copier ailleurs (clé USB, ordinateur) pour plus de sûreté.');
-  annoncer('Sauvegarde enregistrée.');
+  let texte = 'Fichier « ' + nom + ' » créé dans tes Téléchargements. '
+    + 'Tu peux aussi le copier ailleurs (clé USB, ordinateur) pour plus de sûreté.';
+  if (nbVoix) {
+    texte += nbVoix > 1
+      ? ' Attention : tes ' + nbVoix + ' notes vocales ne sont pas dans ce fichier. Elles restent seulement sur ce téléphone.'
+      : " Attention : ta note vocale n'est pas dans ce fichier. Elle reste seulement sur ce téléphone.";
+  }
+  messageSauvegarde(texte);
+  annoncer('Sauvegarde enregistrée.' + (nbVoix ? ' Les notes vocales ne sont pas dedans.' : ''));
 }
 
 $('#btn-sauvegarder').addEventListener('click', enregistrerSauvegarde);
@@ -2680,7 +3733,10 @@ function nettoyerProtocole(p) {
     fond: p.fond === 'clair' ? 'clair' : 'sombre',
     /* null si le fichier date d'avant « Quand ça monte » (version 2.1) :
        on garde alors ce qui est déjà sur le téléphone. */
-    monte: nettoyerMonte(p.monte)
+    monte: nettoyerMonte(p.monte),
+    /* null si le fichier date d'avant les procédures par émotion : on
+       garde alors celles du téléphone. */
+    emotions: nettoyerEmotions(p.emotions)
   };
 }
 
@@ -2728,6 +3784,7 @@ function resumeRestauration(r) {
   if (r.crises && r.crises.length) contenu.push(pluriel(r.crises.length, 'entrée de journal', 'entrées de journal'));
   if (r.liens && r.liens.length) contenu.push(pluriel(r.liens.length, 'lien apaisant', 'liens apaisants'));
   if (r.protocole) contenu.push('ton protocole');
+  if (r.protocole && r.protocole.emotions) contenu.push('tes procédures par émotion');
   if (r.reglages && Object.keys(r.reglages).length) contenu.push('tes réglages');
   if (!contenu.length) return null;
 
@@ -2738,6 +3795,7 @@ function resumeRestauration(r) {
 
   let texte = date + ' : ' + liste + '. ';
   if (r.crises || r.liens) texte += 'Ce qui est déjà sur ce téléphone est gardé, sans doublon. ';
+  if (r.crises && r.crises.length) texte += "Les notes vocales ne sont jamais dans une sauvegarde : seul le texte des entrées revient. ";
   if (r.protocole || r.reglages) {
     texte += (r.protocole && r.reglages ? 'Le protocole et les réglages actuels seront remplacés'
       : r.protocole ? 'Le protocole actuel sera remplacé' : 'Les réglages actuels seront remplacés')
@@ -2829,6 +3887,7 @@ $('#btn-restaurer-confirmer').addEventListener('click', async () => {
       await BDD.ecrireProtocole({
         ...r.protocole,
         monte: r.protocole.monte || protocole.monte || monteVide(),
+        emotions: r.protocole.emotions || protocole.emotions || emotionsDefaut(),
         maj: Date.now()
       });
     }

@@ -15,9 +15,24 @@ et la confiance. Toute demande qui semble entrer en conflit avec l'une d'elles
 doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
 
 - **Jamais de son, jamais de vibration, jamais de notification.** Garanti par
-  construction : `app.js` n'appelle jamais `navigator.vibrate`, ne crée jamais
-  d'objet `Audio` et ne demande jamais l'autorisation d'envoyer des
-  notifications. Ne pas introduire ces appels, même « discrets ».
+  construction : `app.js` n'appelle jamais `navigator.vibrate` et ne demande
+  jamais l'autorisation d'envoyer des notifications. Ne pas introduire ces
+  appels, même « discrets ».
+  **Une seule exception, voulue (octobre 2026, retours d'utilisateurs) :
+  la note vocale du journal** (section 5 bis d'`app.js`). Le seul élément
+  `<audio>` de l'application est créé par `ecouter()`, **uniquement sur
+  appui** d'un bouton « Écouter » ; jamais de lecture automatique, jamais
+  en bouclier (classe `voix` masquée, `couperVoix()` dans
+  `activerBouclier`), et la lecture se tait en quittant le journal ou
+  l'application. Le micro n'est demandé que sur « Enregistrer ma voix »,
+  dans le formulaire détaillé, jamais dans « Noter une crise maintenant ».
+  5 minutes au plus, aucune transcription. Aucun autre son nulle part.
+- **Notes vocales : tiroir `notesVocales` (IndexedDB v3), clé = `id` de
+  l'entrée.** L'entrée dans `crises` n'est pas modifiée ; supprimer une
+  entrée supprime sa note dans la même transaction. **L'audio n'entre
+  jamais dans la sauvegarde JSON** (trop lourd), et c'est écrit en
+  avertissement dans les Réglages, le journal et le message après
+  sauvegarde.
 - **Aucun blanc pur ni noir pur** dans les thèmes normaux. Seul le mode
   « bouclier sensoriel » passe au `#000`, et uniquement parce que les pixels
   OLED éteints réduisent la lumière émise.
@@ -63,6 +78,21 @@ doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
   consigne, et des `id` qui ne changent jamais. Son bouton d'accueil et son
   écran disparaissent en bouclier, comme les liens apaisants. Une
   sauvegarde plus ancienne (sans `monte`) ne l'efface pas à la restauration.
+- **Procédures par émotion (« Ce que je ressens ») : pour soi, jamais sur
+  la carte.** Rangées dans `protocole.emotions` (même enregistrement, même
+  sauvegarde que le protocole), elles n'entrent jamais dans
+  `lignesProtocole()`. Exemples de départ dans `EMOTIONS_DEFAUT`, définis
+  **avant** `let protocole` (sinon erreur au démarrage). Contrairement au
+  protocole, tout y est modifiable par la personne (nom, smiley, étapes) ;
+  les `id` d'émotions et d'étapes retiennent les cases cochées et ne
+  changent pas. Les cases cochées pendant la crise sont à part
+  (`refuge.emotionsCoches`, localStorage, gardées pour la journée en
+  cours sauf décochage, remises à zéro le lendemain) et hors
+  sauvegarde. Une sauvegarde sans `emotions` ne les efface pas à la
+  restauration. **Reste visible et lisible en bouclier** (contrairement à
+  « Quand ça monte ») ; les smileys y passent en gris. Noms sans accord
+  (« Colère », « Épuisement ») ; étapes à l'infinitif ou à la première
+  personne, jamais une consigne médicale.
 - **Phrases courtes à montrer : seulement pour « Montrer un message ».**
   Elles s'affichent en grand et ne déclenchent jamais rien (ni SMS, ni
   appel). Absentes de la carte « J'ai besoin d'aide ». Elles parlent aux
