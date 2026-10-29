@@ -15,8 +15,23 @@ sur le téléphone.
 | **Accueil** | Le gros bouton d'aide (SMS pré-rempli), le bouclier sensoriel, le message à montrer (avec des phrases courtes), « Quand ça monte », les numéros d'urgence |
 | **Respirer** | Respiration guidée : cohérence 5-5, apaisant 4-7-8, carré 4-4-4-4 |
 | **Protocole** | Ce qui m'aide en crise, à cocher — la carte image pour l'écran verrouillé — et, pour soi, « Quand je sens que ça monte » |
-| **Journal** | Historique des crises, note en un appui, ce qui revient le plus souvent, export CSV et sauvegarde JSON |
+| **Journal** | Historique des crises, note en un appui, note vocale facultative, ce qui revient le plus souvent, export CSV et sauvegarde JSON |
 | **Réglages** | Contact, textes, phrases courtes, thème et gammes de couleurs, taille du texte, déclencheurs personnels, position facultative, sauvegarde et restauration de toutes les données |
+
+### Nouveauté : une note vocale dans le journal
+
+Après une crise, parler peut être plus facile qu'écrire. Dans le formulaire
+détaillé du journal, « Enregistrer ma voix » garde une note de 5 minutes au
+plus, sur le téléphone seulement, sans aucune transcription. Elle se réécoute
+ou se supprime depuis l'entrée.
+
+C'est la **seule** exception à « jamais de son » : le micro ne s'ouvre que sur
+appui, le son ne sort que sur « Écouter », et tout disparaît en bouclier
+sensoriel. Quitter le journal ou l'application coupe la lecture.
+
+⚠️ **Les notes vocales ne sont pas dans la sauvegarde JSON** (elles seraient
+trop lourdes). Le texte des entrées y est, mais pas la voix : si les données
+de Refuge sont effacées ou si vous changez de téléphone, elles sont perdues.
 
 ### Nouveautés de la version 2.2
 
@@ -74,7 +89,7 @@ bouclier, c'est le silence, pas un menu de plus.
 
 La mise à jour conserve le journal de crises existant : la base passe de la
 version 1 à la version 2 en ajoutant deux tiroirs à côté de l'ancien, sans y
-toucher.
+toucher. La version 3 ajoute de même un tiroir pour les notes vocales.
 
 ---
 

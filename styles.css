@@ -491,6 +491,17 @@ html[data-bouclier="on"] .urgence button.arme {
 .jauge i.plein { background: var(--accent); }
 .supprimer { width: auto; min-height: 60px; padding: 10px 16px; font-size: 0.9rem; margin-top: 12px; }
 
+/* Notes vocales. Le temps écoulé change une fois par seconde, sans
+   clignotement ni couleur vive. En bouclier, tout disparaît : aucun son
+   ne peut venir de Refuge pendant le bouclier. */
+.zone-voix { margin-bottom: 16px; }
+.zone-voix > button { margin-bottom: 12px; }
+.zone-voix .bouton-rangee { margin-bottom: 12px; }
+.etiquette { margin-bottom: 4px; color: var(--texte-doux); font-size: 0.92rem; }
+.voix-etat { font-variant-numeric: tabular-nums; margin-bottom: 12px; }
+.entree .voix-temps { font-variant-numeric: tabular-nums; }
+html[data-bouclier="on"] .voix { display: none !important; }
+
 /* ---------- 10. Respiration ---------- */
 
 .scene-respiration {

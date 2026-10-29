@@ -2,10 +2,12 @@
    REFUGE — logique de l'application
    Écrit pour être relu : chaque bloc est commenté en français.
 
-   RÈGLE DE SILENCE : ce fichier n'appelle JAMAIS navigator.vibrate,
-   ne crée JAMAIS d'objet Audio, et ne demande JAMAIS l'autorisation
-   d'envoyer des notifications. L'application ne peut donc émettre
-   aucun son ni aucune vibration, par construction.
+   RÈGLE DE SILENCE : ce fichier n'appelle JAMAIS navigator.vibrate
+   et ne demande JAMAIS l'autorisation d'envoyer des notifications.
+   Une seule exception au silence, voulue et encadrée : la réécoute
+   d'une note vocale du journal (section 5 bis). Le lecteur n'est créé
+   QUE par un appui sur « Écouter », jamais en bouclier, et se tait dès
+   qu'on quitte le journal ou l'application. Aucun autre son, nulle part.
    ============================================================ */
 
 'use strict';
@@ -155,6 +157,10 @@ function activerBouclier(actif) {
   majEntreeMonte();
   if (actif && !$('#ecran-monte').hidden) ouvrirEcranMonte(false);
 
+  /* Notes vocales : les boutons disparaissent (CSS, classe « voix »),
+     la lecture se tait, un enregistrement en cours s'arrête et est gardé. */
+  if (actif) couperVoix('quand le bouclier s\'est allumé');
+
   majCouleurBarre();
   annoncer(actif
     ? 'Bouclier sensoriel activé. Écran noir, application silencieuse.'
@@ -190,6 +196,8 @@ function allerA(nom) {
 
   /* Par respect du calme : quitter l'onglet respiration arrête la séance. */
   if (nom !== 'respiration' && respiration.enCours) respiration.arreter();
+  /* Même chose pour une note vocale : quitter le journal la fait taire. */
+  if (nom !== 'journal') couperVoix('quand tu as quitté le journal');
   if (nom === 'journal') afficherCrises();
 }
 
@@ -694,7 +702,7 @@ const BDD = {
      ------------------------------------------------------------
      IndexedDB fonctionne par numéro de version. La v1 de Refuge ne
      connaissait qu'un seul tiroir : « crises ». La v2 en ajoute deux,
-     « protocole » et « liens ».
+     « protocole » et « liens ». La v3 ajoute « notesVocales ».
 
      La règle d'or est ici : on n'ouvre JAMAIS un tiroir existant pour
      le recréer. onupgradeneeded ne crée que ce qui manque
@@ -709,7 +717,7 @@ const BDD = {
 
   ouvrir() {
     return new Promise((resoudre, rejeter) => {
-      const demande = indexedDB.open('refuge', 2);
+      const demande = indexedDB.open('refuge', 3);
 
       demande.onupgradeneeded = () => {
         const b = demande.result;
@@ -730,6 +738,13 @@ const BDD = {
         /* v2 — les liens apaisants, numérotés automatiquement. */
         if (!b.objectStoreNames.contains('liens')) {
           b.createObjectStore('liens', { keyPath: 'id', autoIncrement: true });
+        }
+
+        /* v3 — les notes vocales du journal. Une note par entrée, rangée
+           sous le numéro (id) de l'entrée : pas de keyPath. L'entrée
+           elle-même, dans « crises », n'est pas modifiée. */
+        if (!b.objectStoreNames.contains('notesVocales')) {
+          b.createObjectStore('notesVocales');
         }
       };
 
@@ -762,7 +777,20 @@ const BDD = {
 
   /* --- Journal de crises (inchangé depuis la v1) --- */
   ajouter(entree) { return BDD.operation('crises', 'readwrite', (m) => m.add(entree)); },
-  supprimer(id)   { return BDD.operation('crises', 'readwrite', (m) => m.delete(id)); },
+  /* Supprimer une entrée supprime aussi sa note vocale, dans la même
+     transaction : jamais d'enregistrement orphelin. */
+  supprimer(id) {
+    return new Promise((resoudre, rejeter) => {
+      if (!BDD.base) { rejeter(new Error('Base locale indisponible')); return; }
+      try {
+        const t = BDD.base.transaction(['crises', 'notesVocales'], 'readwrite');
+        t.objectStore('crises').delete(id);
+        t.objectStore('notesVocales').delete(id);
+        t.oncomplete = () => resoudre();
+        t.onerror = () => rejeter(t.error);
+      } catch (e) { rejeter(e); }
+    });
+  },
   /* put() remplace l'entrée qui porte le même id : c'est ainsi qu'on
      complète une crise notée rapidement. Aucun changement de tiroir. */
   modifier(entree) { return BDD.operation('crises', 'readwrite', (m) => m.put(entree)); },
@@ -775,7 +803,22 @@ const BDD = {
   /* --- Liens apaisants --- */
   liensTout()        { return BDD.operation('liens', 'readonly',  (m) => m.getAll()); },
   liensAjouter(l)    { return BDD.operation('liens', 'readwrite', (m) => m.add(l)); },
-  liensSupprimer(id) { return BDD.operation('liens', 'readwrite', (m) => m.delete(id)); }
+  liensSupprimer(id) { return BDD.operation('liens', 'readwrite', (m) => m.delete(id)); },
+
+  /* --- Notes vocales : { audio (Blob), type, duree (secondes), ts } --- */
+  voixLire(id)          { return BDD.operation('notesVocales', 'readonly',  (m) => m.get(id)); },
+  voixEcrire(id, note)  { return BDD.operation('notesVocales', 'readwrite', (m) => m.put(note, id)); },
+  voixSupprimer(id)     { return BDD.operation('notesVocales', 'readwrite', (m) => m.delete(id)); },
+  /* La durée de chaque note, par numéro d'entrée, sans lire le son. */
+  voixDurees() {
+    const durees = new Map();
+    return BDD.operation('notesVocales', 'readonly', (m) => {
+      m.openCursor().onsuccess = (e) => {
+        const c = e.target.result;
+        if (c) { durees.set(c.key, c.value.duree); c.continue(); }
+      };
+    }).then(() => durees);
+  }
 };
 
 /* --- État du formulaire d'ajout --- */
@@ -784,6 +827,10 @@ const brouillon = { duree: null, intensite: null, declencheurs: [] };
 /* L'entrée qu'on complète ou qu'on modifie (son id), ou null pour une
    nouvelle entrée. */
 let criseEnEdition = null;
+
+/* Les entrées qui ont une note vocale : numéro → durée en secondes.
+   Relu à chaque affichage du journal (section 5 bis). */
+let dureesVoix = new Map();
 
 /* Gère les groupes de boutons à choix unique (durée, intensité). */
 function choixUnique(idGroupe, surChoix) {
@@ -904,6 +951,7 @@ function remplirFormulaire(entree) {
   construireDeclencheurs(Array.isArray(e.declencheurs) ? e.declencheurs : []);
   $('#f-autre-declencheur').value = '';
   $('#f-note').value = e.note || '';
+  preparerVoix(criseEnEdition);
 }
 
 function ouvrirFormulaire(ouvert, entree) {
@@ -917,6 +965,9 @@ function ouvrirFormulaire(ouvert, entree) {
     $('#f-date').focus({ preventScroll: true });
   } else {
     criseEnEdition = null;
+    /* « Annuler » : un enregistrement en cours ou pas encore rangé est
+       abandonné, la note déjà rangée reste telle quelle. */
+    preparerVoix(null);
   }
 }
 
@@ -930,9 +981,11 @@ function messageJournal(texte) {
   zone.classList.toggle('masque', !texte);
 }
 
-/* Une entrée « rapide » n'a que son heure : rien d'autre n'a été noté. */
+/* Une entrée « rapide » n'a que son heure : rien d'autre n'a été noté,
+   pas même une note vocale. */
 function estRapide(c) {
-  return !c.duree && !c.intensite && !(c.declencheurs && c.declencheurs.length) && !c.note;
+  return !c.duree && !c.intensite && !(c.declencheurs && c.declencheurs.length) && !c.note
+    && !dureesVoix.has(c.id);
 }
 
 /* Noter une crise en un seul appui : après une crise, l'énergie manque
@@ -956,6 +1009,9 @@ $('#btn-noter-vite').addEventListener('click', async () => {
 
 $('#form-crise').addEventListener('submit', async (e) => {
   e.preventDefault();
+  /* Un enregistrement encore en cours est arrêté et gardé. */
+  await arreterEnregistrement();
+  arreterLecture();
   const entree = {
     ts: new Date($('#f-date').value || maintenantLocal()).getTime(),
     duree: brouillon.duree,
@@ -965,8 +1021,37 @@ $('#form-crise').addEventListener('submit', async (e) => {
   };
   const enEdition = criseEnEdition;
   try {
+    let id = enEdition;
     if (enEdition !== null) await BDD.modifier({ ...entree, id: enEdition });
-    else await BDD.ajouter(entree);
+    else id = await BDD.ajouter(entree);
+
+    /* La note vocale, rangée à part sous le numéro de l'entrée. Si elle
+       ne passe pas (téléphone plein), le texte est déjà enregistré : le
+       formulaire reste ouvert sur cette entrée pour pouvoir réessayer. */
+    try {
+      if (voix.nouvelle) {
+        await BDD.voixEcrire(id, {
+          audio: voix.nouvelle.audio,
+          type: voix.nouvelle.type,
+          duree: voix.nouvelle.duree,
+          ts: Date.now()
+        });
+      } else if (voix.aSupprimer) {
+        await BDD.voixSupprimer(id);
+      }
+    } catch (err) {
+      console.error(err);
+      criseEnEdition = id;
+      $('#titre-form-crise').textContent = "Modifier l'entrée";
+      await afficherCrises();
+      const texte = "Le texte de l'entrée est enregistré, mais pas la note vocale : "
+        + 'le téléphone manque peut-être de place. Tu peux réessayer avec '
+        + '« Enregistrer », en bas, ou toucher « Annuler ».';
+      messageVoix(texte);
+      annoncer(texte);
+      return;
+    }
+
     ouvrirFormulaire(false);
     /* Remise à zéro du formulaire pour la prochaine fois. */
     remplirFormulaire(null);
@@ -993,6 +1078,11 @@ async function afficherCrises() {
   let liste = [];
   try { liste = await BDD.tout(); } catch (e) { console.error(e); }
   liste.sort((a, b) => b.ts - a.ts);   /* la plus récente en premier */
+  try { dureesVoix = await BDD.voixDurees(); } catch (e) { dureesVoix = new Map(); console.error(e); }
+
+  /* Les boutons de la liste vont être refaits : une écoute lancée
+     depuis la liste s'arrête. */
+  if (lecture.bouton && lecture.bouton.closest('#liste-crises')) arreterLecture();
 
   const conteneur = $('#liste-crises');
   $('#outils-journal').classList.toggle('masque', liste.length === 0);
@@ -1052,6 +1142,20 @@ async function afficherCrises() {
       bloc.appendChild(rapide);
     }
 
+    /* Note vocale : une ligne, puis « Écouter » et « Supprimer la note
+       vocale » avec les autres boutons. Tout disparaît en bouclier. */
+    const aVoix = dureesVoix.has(c.id);
+    const dureeVoix = dureesVoix.get(c.id) || 0;
+    let ligneVoix = null;
+    if (aVoix) {
+      ligneVoix = document.createElement('p');
+      ligneVoix.className = 'meta voix voix-temps';
+      const texteRepos = () => { ligneVoix.textContent = 'Note vocale : ' + dureeParlee(dureeVoix) + '.'; };
+      texteRepos();
+      ligneVoix.texteRepos = texteRepos;
+      bloc.appendChild(ligneVoix);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'actions-entree';
 
@@ -1062,6 +1166,51 @@ async function afficherCrises() {
     completer.setAttribute('aria-label', completer.textContent + " l'entrée du " + FORMAT_DATE.format(new Date(c.ts)));
     completer.addEventListener('click', () => ouvrirFormulaire(true, c));
     actions.appendChild(completer);
+
+    if (aVoix) {
+      const quand = FORMAT_DATE.format(new Date(c.ts));
+      const ecouterBtn = document.createElement('button');
+      ecouterBtn.type = 'button';
+      ecouterBtn.className = 'supprimer voix';
+      ecouterBtn.textContent = 'Écouter';
+      ecouterBtn.setAttribute('aria-label', 'Écouter la note vocale du ' + quand);
+      /* La lecture ne démarre que sur cet appui. */
+      ecouterBtn.addEventListener('click', async () => {
+        if (lecture.bouton === ecouterBtn) { arreterLecture(); annoncer('Écoute arrêtée.'); return; }
+        let note = null;
+        try { note = await BDD.voixLire(c.id); } catch (err) { console.error(err); }
+        if (!note || !note.audio) { messageJournal("La note vocale n'a pas pu être lue."); return; }
+        ecouter(note.audio, note.duree, ecouterBtn, ligneVoix, ligneVoix.texteRepos);
+      });
+      actions.appendChild(ecouterBtn);
+
+      const supVoix = document.createElement('button');
+      supVoix.type = 'button';
+      supVoix.className = 'supprimer voix';
+      supVoix.textContent = 'Supprimer la note vocale';
+      supVoix.setAttribute('aria-label', 'Supprimer la note vocale du ' + quand);
+      let armeVoix = false;
+      supVoix.addEventListener('click', async () => {
+        if (!armeVoix) {
+          armeVoix = true;
+          supVoix.textContent = 'Confirmer la suppression';
+          setTimeout(() => { armeVoix = false; supVoix.textContent = 'Supprimer la note vocale'; }, 4000);
+          return;
+        }
+        try {
+          await BDD.voixSupprimer(c.id);
+        } catch (err) {
+          console.error(err);
+          messageJournal("La note vocale n'a pas pu être supprimée.");
+          return;
+        }
+        /* Si cette entrée est ouverte dans le formulaire, il l'apprend. */
+        if (criseEnEdition === c.id) { voix.existante = null; voix.aSupprimer = false; majVoix(); }
+        await afficherCrises();
+        annoncer('Note vocale supprimée.');
+      });
+      actions.appendChild(supVoix);
+    }
 
     const sup = document.createElement('button');
     sup.type = 'button';
@@ -1152,6 +1301,342 @@ $('#btn-export-csv').addEventListener('click', async () => {
    fabriquée par enregistrerSauvegarde(), section 12 : le même fichier
    que le bouton des Réglages. */
 $('#btn-export-json').addEventListener('click', enregistrerSauvegarde);
+
+
+/* ============================================================
+   5 bis. NOTES VOCALES DU JOURNAL
+   ------------------------------------------------------------
+   Après une crise, parler peut être plus facile qu'écrire. Chaque
+   entrée peut donc porter une note vocale de 5 minutes au plus,
+   rangée dans le tiroir « notesVocales » sous le numéro de l'entrée.
+
+   Les garde-fous, tous voulus :
+     • rien ne démarre seul : le micro ne s'ouvre que sur « Enregistrer
+       ma voix », le son ne sort que sur « Écouter » ;
+     • le micro n'est demandé que là, dans le formulaire détaillé,
+       jamais dans « Noter une crise maintenant » (utilisé en crise) ;
+     • en bouclier, tout disparaît (CSS, classe « voix ») et ce qui
+       tourne s'arrête : l'enregistrement est gardé, la lecture coupée ;
+     • quitter le journal ou l'application coupe la lecture et arrête
+       l'enregistrement (ce qui a été dit est gardé) ;
+     • aucune transcription, rien n'est envoyé nulle part ;
+     • la sauvegarde JSON ne contient PAS l'audio (trop lourd) : c'est
+       écrit dans les Réglages et dans le journal.
+
+   Dans le formulaire, rien n'est écrit dans la base avant l'appui sur
+   « Enregistrer », en bas : « Annuler » laisse tout comme avant.
+   ============================================================ */
+
+const DUREE_MAX_VOIX = 5 * 60;   /* en secondes */
+
+/* Les formats, du préféré au moins bon : Chrome prend le premier,
+   Safari le format mp4. À 32 kbit/s, une voix reste claire et 5 minutes
+   tiennent dans environ 1,2 Mo. */
+const FORMATS_VOIX = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm'];
+
+const voix = {
+  existante: null,    /* durée de la note déjà rangée pour l'entrée modifiée, ou null */
+  nouvelle: null,     /* { audio, type, duree } : enregistrée, pas encore rangée */
+  aSupprimer: false,  /* la note rangée partira à l'appui sur « Enregistrer » */
+  enregistreur: null, /* le MediaRecorder pendant un enregistrement */
+  debut: 0,
+  minuteur: null,
+  limite: null,
+  jeter: false,       /* « Annuler » pendant l'enregistrement : rien n'est gardé */
+  finie: Promise.resolve(),
+  demandeEnCours: false
+};
+
+/* 75 → « 1:15 » */
+function minutesSecondes(s) {
+  s = Math.max(0, Math.floor(s));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+/* 75 → « 1 min 15 s » */
+function dureeParlee(s) {
+  s = Math.max(1, Math.round(s || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (!m) return r + ' s';
+  return r ? m + ' min ' + r + ' s' : m + ' min';
+}
+
+function messageVoix(texte) {
+  const zone = $('#voix-message');
+  zone.textContent = texte;
+  zone.classList.toggle('masque', !texte);
+}
+
+/* Met la zone « Note vocale » du formulaire d'accord avec l'état. */
+function majVoix() {
+  const enCours = !!voix.enregistreur;
+  const duree = voix.nouvelle ? voix.nouvelle.duree : (voix.aSupprimer ? null : voix.existante);
+  const aUneNote = duree !== null;
+  const etat = $('#voix-etat');
+  if (enCours) {
+    etat.textContent = 'Enregistrement en cours : '
+      + minutesSecondes((Date.now() - voix.debut) / 1000) + ' (5:00 au plus)';
+  } else if (voix.nouvelle) {
+    etat.textContent = 'Nouvelle note vocale de ' + dureeParlee(duree)
+      + '. Elle sera gardée quand tu toucheras « Enregistrer », en bas.';
+  } else if (aUneNote) {
+    etat.textContent = 'Note vocale de ' + dureeParlee(duree) + '.';
+  } else if (voix.aSupprimer) {
+    etat.textContent = 'La note vocale sera supprimée quand tu toucheras « Enregistrer », en bas.';
+  }
+  etat.classList.toggle('masque', !enCours && !aUneNote && !voix.aSupprimer);
+  $('#voix-enregistrer').classList.toggle('masque', enCours);
+  $('#voix-enregistrer').textContent = aUneNote ? 'Recommencer (remplace la note)' : 'Enregistrer ma voix';
+  $('#voix-arreter').classList.toggle('masque', !enCours);
+  $('#voix-actions').classList.toggle('masque', enCours || !aUneNote);
+}
+
+/* Remet la zone à zéro pour l'entrée qu'on ouvre (id), ou une nouvelle. */
+function preparerVoix(id) {
+  arreterEnregistrement(true);
+  arreterLecture();
+  voix.nouvelle = null;
+  voix.aSupprimer = false;
+  voix.existante = id !== null && dureesVoix.has(id) ? dureesVoix.get(id) || 0 : null;
+  messageVoix('');
+  majVoix();
+}
+
+/* Le refus du micro n'est pas une erreur de la personne : on le dit
+   simplement, avec l'autre chemin (écrire), et comment changer d'avis. */
+function texteErreurMicro(err) {
+  const nom = err && err.name;
+  if (nom === 'NotAllowedError' || nom === 'SecurityError' || nom === 'PermissionDeniedError') {
+    return "Refuge n'a pas accès au micro. Ce n'est pas grave : tu peux écrire ta note à la place. "
+      + 'Si tu changes d\'avis, autorise le micro pour Refuge dans les réglages de Chrome '
+      + '(Paramètres des sites, puis Micro).';
+  }
+  if (nom === 'NotFoundError' || nom === 'OverconstrainedError' || nom === 'DevicesNotFoundError') {
+    return "Aucun micro n'a été trouvé sur cet appareil. Tu peux écrire ta note à la place.";
+  }
+  if (nom === 'NotReadableError' || nom === 'TrackStartError' || nom === 'AbortError') {
+    return 'Le micro est déjà pris par une autre application (un appel, par exemple). '
+      + 'Ferme-la, puis réessaie.';
+  }
+  return "L'enregistrement n'a pas pu démarrer. Tu peux écrire ta note à la place.";
+}
+
+async function commencerEnregistrement() {
+  if (voix.enregistreur || voix.demandeEnCours || bouclierActif) return;
+  messageVoix('');
+  arreterLecture();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    messageVoix("Ce navigateur ne sait pas enregistrer le son. Tu peux écrire ta note à la place.");
+    return;
+  }
+
+  let flux;
+  voix.demandeEnCours = true;
+  try {
+    flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    messageVoix(texteErreurMicro(err));
+    annoncer('Micro indisponible.');
+    return;
+  } finally {
+    voix.demandeEnCours = false;
+  }
+
+  /* Pendant la question du téléphone, la personne a pu fermer le
+     formulaire, quitter Refuge ou allumer le bouclier : on n'enregistre
+     rien, et le micro est rendu tout de suite. */
+  if ($('#form-crise').classList.contains('masque') || bouclierActif || document.hidden) {
+    flux.getTracks().forEach((piste) => piste.stop());
+    return;
+  }
+
+  const format = (MediaRecorder.isTypeSupported && FORMATS_VOIX.find((f) => MediaRecorder.isTypeSupported(f))) || '';
+  let enregistreur;
+  try {
+    enregistreur = new MediaRecorder(flux, format
+      ? { mimeType: format, audioBitsPerSecond: 32000 }
+      : { audioBitsPerSecond: 32000 });
+  } catch (err) {
+    flux.getTracks().forEach((piste) => piste.stop());
+    messageVoix("L'enregistrement n'a pas pu démarrer. Tu peux écrire ta note à la place.");
+    return;
+  }
+
+  const morceaux = [];
+  voix.jeter = false;
+  enregistreur.ondataavailable = (e) => { if (e.data && e.data.size) morceaux.push(e.data); };
+  enregistreur.onerror = () => {
+    messageVoix("L'enregistrement s'est interrompu. Ce qui a été dit jusque-là est gardé.");
+  };
+  voix.finie = new Promise((fini) => {
+    enregistreur.onstop = () => {
+      /* Le micro est rendu : le voyant du téléphone s'éteint. */
+      flux.getTracks().forEach((piste) => piste.stop());
+      clearInterval(voix.minuteur);
+      clearTimeout(voix.limite);
+      const duree = Math.min(DUREE_MAX_VOIX, Math.max(1, Math.round((Date.now() - voix.debut) / 1000)));
+      voix.enregistreur = null;
+      const garde = !voix.jeter && morceaux.length > 0;
+      if (garde) {
+        const type = enregistreur.mimeType || format || 'audio/webm';
+        voix.nouvelle = { audio: new Blob(morceaux, { type: type }), type: type, duree: duree };
+        voix.aSupprimer = false;
+      } else if (!voix.jeter) {
+        /* Arrêté trop vite : le micro n'avait encore rien capté. */
+        messageVoix("Rien n'a été enregistré : c'était trop court. Tu peux réessayer.");
+      }
+      const avaitLeFocus = document.activeElement === $('#voix-arreter');
+      majVoix();
+      if (avaitLeFocus && !voix.jeter) $(garde ? '#voix-ecouter' : '#voix-enregistrer').focus();
+      fini();
+    };
+  });
+
+  voix.enregistreur = enregistreur;
+  voix.debut = Date.now();
+  enregistreur.start(1000);   /* un morceau par seconde : rien n'est perdu si ça s'arrête */
+  /* Le temps écoulé change une fois par seconde, sans clignoter. */
+  voix.minuteur = setInterval(majVoix, 1000);
+  voix.limite = setTimeout(() => {
+    arreterEnregistrement();
+    messageVoix("5 minutes atteintes : l'enregistrement s'est arrêté tout seul. Il est gardé.");
+    annoncer('Enregistrement arrêté au bout de 5 minutes.');
+  }, DUREE_MAX_VOIX * 1000);
+  majVoix();
+  $('#voix-arreter').focus();
+  annoncer('Enregistrement commencé.');
+}
+
+/* Arrête l'enregistrement en cours ; « jeter » : ne rien garder.
+   La promesse se résout quand la note est vraiment prête. */
+function arreterEnregistrement(jeter) {
+  if (!voix.enregistreur) return voix.finie;
+  if (jeter) voix.jeter = true;
+  clearInterval(voix.minuteur);
+  clearTimeout(voix.limite);
+  if (voix.enregistreur.state !== 'inactive') voix.enregistreur.stop();
+  return voix.finie;
+}
+
+/* --- Lecture ---
+   Un seul lecteur à la fois. Il n'est créé QUE par un appui sur un
+   bouton « Écouter » : c'est la seule source de son de toute
+   l'application. Un deuxième appui sur le même bouton l'arrête. */
+const lecture = { element: null, url: null, bouton: null, texte: '', aria: null, apresArret: null };
+
+function arreterLecture() {
+  if (!lecture.element) return;
+  lecture.element.pause();
+  lecture.element.removeAttribute('src');
+  lecture.element.load();   /* le fichier est relâché */
+  URL.revokeObjectURL(lecture.url);
+  const { bouton, texte, aria, apresArret } = lecture;
+  lecture.element = lecture.url = lecture.bouton = lecture.apresArret = null;
+  bouton.textContent = texte;
+  if (aria) bouton.setAttribute('aria-label', aria);
+  if (apresArret) apresArret();
+}
+
+/* audio : le Blob ; duree : en secondes ; temps : le texte où afficher
+   l'avancée ; apresArret : remet ce texte comme avant. */
+function ecouter(audio, duree, bouton, temps, apresArret) {
+  if (lecture.bouton === bouton) {
+    arreterLecture();
+    annoncer('Écoute arrêtée.');
+    return;
+  }
+  arreterLecture();
+  if (bouclierActif || !audio) return;
+
+  const el = document.createElement('audio');
+  lecture.element = el;
+  lecture.url = URL.createObjectURL(audio);
+  lecture.bouton = bouton;
+  lecture.texte = bouton.textContent;
+  lecture.aria = bouton.getAttribute('aria-label');
+  lecture.apresArret = apresArret;
+  bouton.textContent = "Arrêter l'écoute";
+  if (lecture.aria) bouton.setAttribute('aria-label', "Arrêter l'écoute");
+  temps.textContent = 'Écoute : 0:00 sur ' + minutesSecondes(duree);
+
+  el.addEventListener('timeupdate', () => {
+    if (lecture.element === el) {
+      temps.textContent = 'Écoute : ' + minutesSecondes(el.currentTime) + ' sur ' + minutesSecondes(duree);
+    }
+  });
+  el.addEventListener('ended', () => { if (lecture.element === el) arreterLecture(); });
+  el.src = lecture.url;
+  el.play().catch((err) => {
+    if (lecture.element !== el) return;
+    console.error(err);
+    arreterLecture();
+    const texteErreur = "La note vocale n'a pas pu être lue sur ce téléphone.";
+    if (bouton.closest('#form-crise')) messageVoix(texteErreur); else messageJournal(texteErreur);
+    annoncer(texteErreur);
+  });
+}
+
+/* Quitter le journal, quitter Refuge, allumer le bouclier : la lecture
+   se tait, l'enregistrement s'arrête mais reste gardé. */
+function couperVoix(raison) {
+  arreterLecture();
+  if (!voix.enregistreur) return;
+  arreterEnregistrement();
+  messageVoix("L'enregistrement s'est arrêté " + raison + '. Ce qui a été dit est gardé.');
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) couperVoix('quand tu as quitté Refuge');
+});
+
+/* --- Boutons du formulaire --- */
+
+$('#voix-enregistrer').addEventListener('click', commencerEnregistrement);
+
+$('#voix-arreter').addEventListener('click', async () => {
+  await arreterEnregistrement();
+  if (voix.nouvelle) annoncer('Enregistrement arrêté : ' + dureeParlee(voix.nouvelle.duree) + '.');
+});
+
+$('#voix-ecouter').addEventListener('click', async (e) => {
+  const bouton = e.currentTarget;
+  if (lecture.bouton === bouton) { arreterLecture(); annoncer('Écoute arrêtée.'); return; }
+  messageVoix('');
+  let note = voix.nouvelle;
+  if (!note && criseEnEdition !== null) {
+    try { note = await BDD.voixLire(criseEnEdition); } catch (err) { console.error(err); }
+  }
+  if (!note || !note.audio) {
+    messageVoix("La note vocale n'a pas pu être lue.");
+    return;
+  }
+  ecouter(note.audio, note.duree, bouton, $('#voix-etat'), majVoix);
+});
+
+/* Deux appuis, comme partout ailleurs : on ne perd jamais une note par
+   accident. */
+let effacerVoixArme = null;
+$('#voix-effacer').addEventListener('click', (e) => {
+  const b = e.currentTarget;
+  if (!effacerVoixArme) {
+    b.textContent = 'Confirmer la suppression';
+    effacerVoixArme = setTimeout(() => { effacerVoixArme = null; b.textContent = 'Supprimer la note'; }, 4000);
+    return;
+  }
+  clearTimeout(effacerVoixArme);
+  effacerVoixArme = null;
+  b.textContent = 'Supprimer la note';
+  arreterLecture();
+  voix.nouvelle = null;
+  if (voix.existante !== null) voix.aSupprimer = true;
+  messageVoix('');
+  majVoix();
+  $('#voix-enregistrer').focus();
+  annoncer(voix.aSupprimer
+    ? 'La note vocale sera supprimée quand tu enregistreras l\'entrée.'
+    : 'Note vocale supprimée.');
+});
 
 
 /* ============================================================
@@ -2613,6 +3098,12 @@ async function enregistrerSauvegarde() {
     return;
   }
 
+  /* Les notes vocales ne partent PAS dans le fichier : trop lourdes.
+     Elles vivent dans leur propre tiroir, qu'on ne lit pas ici ; on les
+     compte seulement, pour prévenir la personne. */
+  let nbVoix = 0;
+  try { nbVoix = (await BDD.voixDurees()).size; } catch (e) { /* rien */ }
+
   const donnees = {
     app: 'refuge',
     version: 3,
@@ -2630,9 +3121,15 @@ async function enregistrerSauvegarde() {
 
   try { localStorage.setItem(CLE_DERNIERE_SAUVEGARDE, String(Date.now())); } catch (e) { /* rien */ }
   afficherDerniereSauvegarde();
-  messageSauvegarde('Fichier « ' + nom + ' » créé dans tes Téléchargements. '
-    + 'Tu peux aussi le copier ailleurs (clé USB, ordinateur) pour plus de sûreté.');
-  annoncer('Sauvegarde enregistrée.');
+  let texte = 'Fichier « ' + nom + ' » créé dans tes Téléchargements. '
+    + 'Tu peux aussi le copier ailleurs (clé USB, ordinateur) pour plus de sûreté.';
+  if (nbVoix) {
+    texte += nbVoix > 1
+      ? ' Attention : tes ' + nbVoix + ' notes vocales ne sont pas dans ce fichier. Elles restent seulement sur ce téléphone.'
+      : " Attention : ta note vocale n'est pas dans ce fichier. Elle reste seulement sur ce téléphone.";
+  }
+  messageSauvegarde(texte);
+  annoncer('Sauvegarde enregistrée.' + (nbVoix ? ' Les notes vocales ne sont pas dedans.' : ''));
 }
 
 $('#btn-sauvegarder').addEventListener('click', enregistrerSauvegarde);
@@ -2738,6 +3235,7 @@ function resumeRestauration(r) {
 
   let texte = date + ' : ' + liste + '. ';
   if (r.crises || r.liens) texte += 'Ce qui est déjà sur ce téléphone est gardé, sans doublon. ';
+  if (r.crises && r.crises.length) texte += "Les notes vocales ne sont jamais dans une sauvegarde : seul le texte des entrées revient. ";
   if (r.protocole || r.reglages) {
     texte += (r.protocole && r.reglages ? 'Le protocole et les réglages actuels seront remplacés'
       : r.protocole ? 'Le protocole actuel sera remplacé' : 'Les réglages actuels seront remplacés')

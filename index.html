@@ -178,6 +178,24 @@
       <label for="f-note">Autre chose à noter (facultatif)</label>
       <textarea id="f-note" placeholder="Ce que je ressentais, ce qui a aidé…"></textarea>
 
+      <!-- Note vocale. Rien ne démarre sans appui : ni l'enregistrement,
+           ni la lecture. Toute la zone disparaît en bouclier sensoriel
+           (classe « voix ») : le bouclier, c'est le silence. -->
+      <div id="f-voix" class="voix zone-voix" role="group" aria-labelledby="voix-titre">
+        <p id="voix-titre" class="etiquette">Note vocale (facultatif)</p>
+        <p><small>Jusqu'à 5 minutes. La première fois, le téléphone te
+           demande si Refuge peut utiliser le micro. Rien n'est transcrit
+           ni envoyé : l'enregistrement reste sur ce téléphone.</small></p>
+        <p id="voix-etat" class="voix-etat masque"></p>
+        <button type="button" id="voix-enregistrer">Enregistrer ma voix</button>
+        <button type="button" id="voix-arreter" class="bouton-doux masque">Arrêter l'enregistrement</button>
+        <div id="voix-actions" class="bouton-rangee masque">
+          <button type="button" id="voix-ecouter">Écouter</button>
+          <button type="button" id="voix-effacer">Supprimer la note</button>
+        </div>
+        <p id="voix-message" class="avis masque" role="status"></p>
+      </div>
+
       <div class="bouton-rangee">
         <button type="button" id="btn-annuler">Annuler</button>
         <button type="submit" class="bouton-doux">Enregistrer</button>
@@ -195,6 +213,9 @@
          liens et tes réglages : c'est elle qu'il faut garder avant de
          changer de téléphone. Pour la remettre en place, va dans
          Réglages, « Restaurer une sauvegarde ».</small></p>
+      <p class="avis"><strong>Attention :</strong> les notes vocales ne
+         sont pas dans la sauvegarde (elles prendraient trop de place).
+         Elles restent seulement sur ce téléphone.</p>
       <div class="bouton-rangee">
         <button type="button" id="btn-export-csv">Exporter (CSV)</button>
         <button type="button" id="btn-export-json">Sauvegarde (JSON)</button>
@@ -488,6 +509,11 @@
          à prévenir et le fond choisi pour la carte. Il contient donc aussi
          des noms et des numéros de téléphone : garde-le en lieu sûr, c'est
          un fichier personnel.</small></p>
+      <p class="avis"><strong>Attention : les notes vocales du journal ne
+         sont pas dans la sauvegarde.</strong> Elles prendraient trop de
+         place. Le texte de chaque entrée est bien sauvegardé, mais si les
+         données de Refuge sont effacées ou si tu changes de téléphone, les
+         enregistrements de ta voix seront perdus.</p>
 
       <button type="button" id="btn-sauvegarder" class="bouton-doux" style="margin-bottom:12px">
         Enregistrer une sauvegarde

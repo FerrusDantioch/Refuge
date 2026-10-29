@@ -15,9 +15,24 @@ et la confiance. Toute demande qui semble entrer en conflit avec l'une d'elles
 doit être **signalée à l'utilisateur** plutôt qu'appliquée telle quelle.
 
 - **Jamais de son, jamais de vibration, jamais de notification.** Garanti par
-  construction : `app.js` n'appelle jamais `navigator.vibrate`, ne crée jamais
-  d'objet `Audio` et ne demande jamais l'autorisation d'envoyer des
-  notifications. Ne pas introduire ces appels, même « discrets ».
+  construction : `app.js` n'appelle jamais `navigator.vibrate` et ne demande
+  jamais l'autorisation d'envoyer des notifications. Ne pas introduire ces
+  appels, même « discrets ».
+  **Une seule exception, voulue (octobre 2026, retours d'utilisateurs) :
+  la note vocale du journal** (section 5 bis d'`app.js`). Le seul élément
+  `<audio>` de l'application est créé par `ecouter()`, **uniquement sur
+  appui** d'un bouton « Écouter » ; jamais de lecture automatique, jamais
+  en bouclier (classe `voix` masquée, `couperVoix()` dans
+  `activerBouclier`), et la lecture se tait en quittant le journal ou
+  l'application. Le micro n'est demandé que sur « Enregistrer ma voix »,
+  dans le formulaire détaillé, jamais dans « Noter une crise maintenant ».
+  5 minutes au plus, aucune transcription. Aucun autre son nulle part.
+- **Notes vocales : tiroir `notesVocales` (IndexedDB v3), clé = `id` de
+  l'entrée.** L'entrée dans `crises` n'est pas modifiée ; supprimer une
+  entrée supprime sa note dans la même transaction. **L'audio n'entre
+  jamais dans la sauvegarde JSON** (trop lourd), et c'est écrit en
+  avertissement dans les Réglages, le journal et le message après
+  sauvegarde.
 - **Aucun blanc pur ni noir pur** dans les thèmes normaux. Seul le mode
   « bouclier sensoriel » passe au `#000`, et uniquement parce que les pixels
   OLED éteints réduisent la lumière émise.
