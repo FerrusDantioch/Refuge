@@ -3,7 +3,7 @@
    En crise, on ne peut pas dépendre du réseau : tout est mis en cache
    la première fois, puis servi depuis le téléphone. */
 
-const CACHE = 'refuge-v30';
+const CACHE = 'refuge-v31';
 
 /* La liste des fichiers indispensables au fonctionnement hors-ligne. */
 const FICHIERS = [
