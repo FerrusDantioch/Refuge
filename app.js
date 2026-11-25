@@ -21,6 +21,15 @@ const racine = document.documentElement;
 /* Annonce un message aux lecteurs d'écran (invisible à l'œil). */
 function annoncer(texte) { $('#annonce').textContent = texte; }
 
+/* Remplit un conteneur avec un unique <small> sans recourir à innerHTML. */
+function ecrireSmall(selecteur, texte) {
+  const zone = $(selecteur);
+  zone.textContent = '';
+  const s = document.createElement('small');
+  s.textContent = texte;
+  zone.appendChild(s);
+}
+
 
 /* ============================================================
    1. RÉGLAGES — conservés dans le téléphone (localStorage)
@@ -157,11 +166,11 @@ function activerBouclier(actif) {
      Le bouclier, c'est le silence total : aucune playlist, aucune vidéo,
      rien à choisir. L'écran se referme s'il était ouvert. */
   $$('.entree-liens').forEach((b) => b.classList.toggle('masque', actif));
-  if (actif && !$('#ecran-liens').hidden) ouvrirEcranLiens(false);
+  if (actif && !$('#ecran-liens').hidden) ouvrirEcranLiens(false, null, { restaurerFocus: false });
 
   /* Même règle pour « Quand ça monte » : c'est un outil d'avant la crise. */
   majEntreeMonte();
-  if (actif && !$('#ecran-monte').hidden) ouvrirEcranMonte(false);
+  if (actif && !$('#ecran-monte').hidden) ouvrirEcranMonte(false, { restaurerFocus: false });
 
   /* Notes vocales : les boutons disparaissent (CSS, classe « voix »),
      la lecture se tait, un enregistrement en cours s'arrête et est gardé. */
@@ -187,7 +196,10 @@ function majCouleurBarre() {
    3. NAVIGATION ENTRE LES ONGLETS
    ============================================================ */
 
+const VUES = ['accueil', 'respiration', 'protocole', 'journal', 'reglages'];
+
 function allerA(nom) {
+  if (!VUES.includes(nom)) nom = 'accueil';
   $$('.vue').forEach((v) => {
     const actif = v.id === 'vue-' + nom;
     v.classList.toggle('active', actif);
@@ -208,6 +220,118 @@ function allerA(nom) {
 }
 
 $$('.onglet').forEach((o) => o.addEventListener('click', () => allerA(o.dataset.vue)));
+
+
+/* ============================================================
+   3 bis. ÉCRANS MODAUX ET RETOUR ANDROID (clavier, inert, popstate)
+   ============================================================ */
+
+const ARRIERE_PLAN = [() => $('main'), () => $('nav.onglets')];
+let modaleActive = null;          /* { el, onClose, ouvreur } */
+let historiqueModalePousse = false;
+let attentesPopstate = 0;         /* ignore le popstate asynchrone de notre propre history.back() */
+
+function focusablesDans(conteneur) {
+  return Array.from(conteneur.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), ' +
+    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter((el) => {
+    if (el.closest('[hidden], .masque')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  });
+}
+
+function ouvrirModale(el, { focus, onClose, depuis, annonce } = {}) {
+  if (modaleActive && modaleActive.el !== el) {
+    fermerModale({ depuisPopstate: true, restaurerFocus: false });
+  }
+  const ouvreur = (modaleActive && modaleActive.el === el)
+    ? modaleActive.ouvreur
+    : (depuis || document.activeElement);
+
+  el.hidden = false;
+  ARRIERE_PLAN.forEach((f) => { const n = f(); if (n) n.inert = true; });
+
+  if (!historiqueModalePousse && attentesPopstate === 0) {
+    try {
+      history.pushState({ refugeModale: el.id }, '');
+      historiqueModalePousse = true;
+    } catch (e) { /* environnement restreint */ }
+  }
+
+  modaleActive = { el, onClose, ouvreur };
+  el.scrollTop = 0;
+  (focus || el).focus({ preventScroll: true });
+  if (annonce) annoncer(annonce);
+}
+
+function fermerModale({ depuisPopstate = false, restaurerFocus = true } = {}) {
+  if (!modaleActive) return;
+  const { el, onClose, ouvreur } = modaleActive;
+  modaleActive = null;
+
+  if (onClose) onClose();
+  el.hidden = true;
+  ARRIERE_PLAN.forEach((f) => { const n = f(); if (n) n.inert = false; });
+
+  if (restaurerFocus && ouvreur && ouvreur.isConnected && ouvreur.offsetParent !== null) {
+    ouvreur.focus();
+  }
+
+  if (historiqueModalePousse) {
+    historiqueModalePousse = false;
+    if (!depuisPopstate) {
+      attentesPopstate++;
+      history.back();
+    }
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!modaleActive) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    fermerModale();
+    return;
+  }
+  if (e.key === 'Tab') {
+    const liste = focusablesDans(modaleActive.el);
+    if (liste.length === 0) {
+      e.preventDefault();
+      modaleActive.el.focus();
+      return;
+    }
+    const premier = liste[0];
+    const dernier = liste[liste.length - 1];
+    const actif = document.activeElement;
+    if (e.shiftKey) {
+      if (actif === premier || actif === modaleActive.el || !modaleActive.el.contains(actif)) {
+        e.preventDefault();
+        dernier.focus();
+      }
+    } else if (actif === dernier || !modaleActive.el.contains(actif)) {
+      e.preventDefault();
+      premier.focus();
+    }
+  }
+});
+
+window.addEventListener('popstate', () => {
+  if (attentesPopstate > 0) {
+    attentesPopstate--;
+    if (attentesPopstate === 0 && modaleActive && !historiqueModalePousse) {
+      try {
+        history.pushState({ refugeModale: modaleActive.el.id }, '');
+        historiqueModalePousse = true;
+      } catch (e) { /* environnement restreint */ }
+    }
+    return;
+  }
+  if (modaleActive) {
+    fermerModale({ depuisPopstate: true, restaurerFocus: true });
+  }
+});
 
 
 /* ============================================================
@@ -445,7 +569,20 @@ function majLignePosition() {
    - « Montrer un message » : elle est POUR LES AUTRES. Vous tendez votre
      téléphone à quelqu'un : aucune action n'y figure, personne ne peut
      déclencher un appel par mégarde. */
-function afficherCarteSos(avecActions) {
+function nettoyerCarteSos() {
+  const carte = $('#carte-sos');
+  carte.classList.remove('contraste-fort');
+  $('#sos-contraste').setAttribute('aria-pressed', 'false');
+  $('#sos-contraste').textContent = 'Éclaircir pour le montrer';
+  $('#sos-avertissement').classList.add('masque');
+  construirePhrases([]);
+  /* On coupe le GPS et on oublie le point : il ne doit pas resservir
+     lors d'une prochaine crise, ailleurs. */
+  position.oublier();
+  majLignePosition();
+}
+
+function afficherCarteSos(avecActions, depuis) {
   $('#sos-message').textContent = messageAMontrer();
   $('#sos-message').classList.remove('phrase');
 
@@ -477,28 +614,24 @@ function afficherCarteSos(avecActions) {
     avert.classList.add('masque');
   }
 
-  $('#carte-sos').hidden = false;
-
-  /* La recherche de position démarre ICI, au premier geste — pas au moment
-     d'envoyer. C'est tout l'intérêt de la carte en deux temps : le point a
-     le temps d'arriver pendant que la personne lit son message, et l'envoi
-     du SMS n'attend rien. Après l'affichage de la carte, car la ligne de
-     transparence ne s'affiche que sur une carte ouverte. */
-  if (montrerEnvoi) position.demarrer(); else position.oublier();
-  majLignePosition();
-
   /* Sans SMS à envoyer, le focus va au bouton « Fermer », mais SANS faire
      défiler (preventScroll) : ce bouton est tout en bas, et la carte
      s'ouvrait sinon déjà descendue, le début du message coupé en haut.
-     Or c'est la première phrase que l'autre personne doit lire. Même
-     piège que pour les numéros d'urgence. */
-  if (montrerEnvoi) {
-    btnEnvoi.focus();
-  } else {
-    $('#sos-fermer').focus({ preventScroll: true });
-    $('#carte-sos').scrollTop = 0;
-  }
-  annoncer(avecActions ? 'Message affiché, avec les actions.' : 'Message affiché en grand.');
+     Or c'est la première phrase que l'autre personne doit lire. */
+  ouvrirModale($('#carte-sos'), {
+    depuis,
+    focus: montrerEnvoi ? btnEnvoi : $('#sos-fermer'),
+    onClose: nettoyerCarteSos,
+    annonce: avecActions ? 'Message affiché, avec les actions.' : 'Message affiché en grand.'
+  });
+
+  /* La recherche de position démarre ICI, au premier geste — pas au moment
+     d'envoyer. Après l'ouverture de la carte, car la ligne de transparence
+     ne s'affiche que sur une carte ouverte. */
+  if (montrerEnvoi) position.demarrer(); else position.oublier();
+  majLignePosition();
+
+  if (!montrerEnvoi) $('#carte-sos').scrollTop = 0;
 }
 
 /* Pourquoi l'application Messages ne s'ouvre PAS toute seule :
@@ -508,12 +641,13 @@ function afficherCarteSos(avecActions) {
    l'ouverture, silencieusement. Un bouton explicite est non seulement
    fiable, il est aussi plus juste : vous voyez le message avant qu'il
    parte, et rien ne s'envoie sans que vous l'ayez décidé. */
-$('#btn-aide').addEventListener('click', () => {
+$('#btn-aide').addEventListener('click', (e) => {
+  const bouton = e.currentTarget;
   if (reglages.aideActiveBouclier && !bouclierActif) activerBouclier(true);
-  afficherCarteSos(true);
+  afficherCarteSos(true, bouton);
 });
 
-$('#btn-carte').addEventListener('click', () => afficherCarteSos(false));
+$('#btn-carte').addEventListener('click', (e) => afficherCarteSos(false, e.currentTarget));
 
 /* --- Phrases courtes à montrer ---
    Une réponse rapide quand la parole s'en va : « Oui », « Non »,
@@ -530,7 +664,7 @@ function phrasesAMontrer() {
 
 function construirePhrases(liste) {
   const zone = $('#sos-phrases');
-  zone.innerHTML = '';
+  zone.textContent = '';
   zone.classList.toggle('masque', liste.length === 0);
   $('#carte-sos').classList.toggle('avec-phrases', liste.length > 0);
   if (!liste.length) return;
@@ -568,20 +702,7 @@ function montrerPhrase(phrase, bouton) {
 /* L'ouverture se fait dans l'instant même de l'appui : aucune attente,
    aucun calcul avant. C'est la condition pour qu'Android l'accepte. */
 $('#sos-envoyer').addEventListener('click', ouvrirSms);
-$('#sos-fermer').addEventListener('click', () => {
-  const carte = $('#carte-sos');
-  carte.hidden = true;
-  carte.classList.remove('contraste-fort');
-  $('#sos-contraste').setAttribute('aria-pressed', 'false');
-  $('#sos-contraste').textContent = 'Éclaircir pour le montrer';
-  $('#sos-avertissement').classList.add('masque');
-  construirePhrases([]);
-  /* On coupe le GPS et on oublie le point : il ne doit pas resservir
-     lors d'une prochaine crise, ailleurs. */
-  position.oublier();
-  majLignePosition();
-  $('#btn-aide').focus();
-});
+$('#sos-fermer').addEventListener('click', () => fermerModale());
 
 /* Retirer ou remettre sa position, tant que la carte est ouverte. */
 $('#sos-position-retirer').addEventListener('click', () => {
@@ -636,7 +757,6 @@ $('#btn-respirer-vite').addEventListener('click', () => {
    quand la motricité fine s'est dégradée.
    ============================================================ */
 
-let ouvreurUrgences = null;   /* le bouton par lequel on est entré */
 let minuteurUrgences = null;
 
 /* Remet tous les boutons d'appel au repos. */
@@ -648,22 +768,21 @@ function desarmerUrgences() {
   });
 }
 
-function ouvrirUrgences(ouvert, depuis) {
-  const carte = $('#carte-urgences');
-  carte.hidden = !ouvert;
-  if (ouvert) {
-    ouvreurUrgences = depuis;
-    /* On donne le focus à la carte elle-même, pas au bouton « Fermer » :
-       celui-ci est tout en bas, et le focus l'aurait fait défiler jusqu'à
-       lui — on ouvrait la liste par la fin. preventScroll pour la même
-       raison. Le 114 doit être la première chose que l'on voit. */
-    carte.focus({ preventScroll: true });
-    carte.scrollTop = 0;
-    annoncer("Numéros d'urgence.");
-  } else {
-    desarmerUrgences();
-    if (ouvreurUrgences) ouvreurUrgences.focus();
+function ouvrirUrgences(ouvert, depuis, opts) {
+  if (!ouvert) {
+    fermerModale(opts);
+    return;
   }
+  /* On donne le focus à la carte elle-même, pas au bouton « Fermer » :
+     celui-ci est tout en bas, et le focus l'aurait fait défiler jusqu'à
+     lui — on ouvrait la liste par la fin. Le 114 doit être la première
+     chose que l'on voit. */
+  ouvrirModale($('#carte-urgences'), {
+    depuis,
+    focus: $('#carte-urgences'),
+    onClose: desarmerUrgences,
+    annonce: "Numéros d'urgence."
+  });
 }
 
 $('#btn-urgences').addEventListener('click', (e) => ouvrirUrgences(true, e.currentTarget));
@@ -886,7 +1005,7 @@ function construireDeclencheurs(coches) {
   });
 
   const zone = $('#f-declencheurs');
-  zone.innerHTML = '';
+  zone.textContent = '';
   liste.forEach((d) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1082,7 +1201,14 @@ function texteDuree(min) {
 
 async function afficherCrises() {
   let liste = [];
-  try { liste = await BDD.tout(); } catch (e) { console.error(e); }
+  let lectureEchouee = false;
+  try {
+    liste = await BDD.tout();
+  } catch (e) {
+    console.error(e);
+    lectureEchouee = true;
+    messageJournal('La base locale est inaccessible : tes entrées ne peuvent pas être affichées.');
+  }
   liste.sort((a, b) => b.ts - a.ts);   /* la plus récente en premier */
   try { dureesVoix = await BDD.voixDurees(); } catch (e) { dureesVoix = new Map(); console.error(e); }
 
@@ -1095,13 +1221,21 @@ async function afficherCrises() {
   afficherBilan(liste);
 
   if (liste.length === 0) {
-    conteneur.innerHTML =
-      '<p class="vide">Aucune entrée pour l\'instant.<br>' +
-      'Rien ne presse : note seulement quand tu en as l\'énergie.</p>';
+    conteneur.textContent = '';
+    if (!lectureEchouee) {
+      const p = document.createElement('p');
+      p.className = 'vide';
+      p.append(
+        document.createTextNode("Aucune entrée pour l'instant."),
+        document.createElement('br'),
+        document.createTextNode("Rien ne presse : note seulement quand tu en as l'énergie.")
+      );
+      conteneur.appendChild(p);
+    }
     return;
   }
 
-  conteneur.innerHTML = '';
+  conteneur.textContent = '';
   liste.forEach((c) => {
     const bloc = document.createElement('article');
     bloc.className = 'entree';
@@ -1233,9 +1367,16 @@ async function afficherCrises() {
         setTimeout(() => { arme = false; sup.textContent = 'Supprimer'; }, 4000);
         return;
       }
-      await BDD.supprimer(c.id);
-      afficherCrises();
-      annoncer('Entrée supprimée.');
+      try {
+        await BDD.supprimer(c.id);
+        await afficherCrises();
+        annoncer('Entrée supprimée.');
+      } catch (err) {
+        console.error(err);
+        const texte = "L'entrée n'a pas pu être supprimée.";
+        messageJournal(texte);
+        annoncer(texte);
+      }
     });
     actions.appendChild(sup);
     bloc.appendChild(actions);
@@ -1287,7 +1428,16 @@ function telecharger(nomFichier, contenu, type) {
 }
 
 $('#btn-export-csv').addEventListener('click', async () => {
-  const liste = (await BDD.tout()).sort((a, b) => a.ts - b.ts);
+  let liste;
+  try {
+    liste = (await BDD.tout()).sort((a, b) => a.ts - b.ts);
+  } catch (err) {
+    console.error(err);
+    const texte = "L'export CSV a échoué : la base locale est illisible.";
+    messageJournal(texte);
+    annoncer(texte);
+    return;
+  }
   const lignes = [['Date', 'Durée (min)', 'Intensité (1-5)', 'Déclencheurs', 'Note']];
   liste.forEach((c) => lignes.push([
     new Date(c.ts).toLocaleString('fr-FR'),
@@ -1306,7 +1456,7 @@ $('#btn-export-csv').addEventListener('click', async () => {
 /* La sauvegarde complète (journal, protocole, liens, réglages) est
    fabriquée par enregistrerSauvegarde(), section 12 : le même fichier
    que le bouton des Réglages. */
-$('#btn-export-json').addEventListener('click', enregistrerSauvegarde);
+$('#btn-export-json').addEventListener('click', () => enregistrerSauvegarde(messageJournal));
 
 
 /* ============================================================
@@ -1763,7 +1913,7 @@ const respiration = {
   terminer() {
     this.arreter();
     $('#consigne').textContent = "C'est fini. Bravo.";
-    $('#compteur').innerHTML = '&nbsp;';
+    $('#compteur').textContent = '\u00A0';
     annoncer('Séance terminée.');
   },
 
@@ -1785,7 +1935,7 @@ const respiration = {
     }
     $('#btn-respi').textContent = 'Commencer';
     $('#consigne').textContent = 'Quand tu veux';
-    $('#compteur').innerHTML = '&nbsp;';
+    $('#compteur').textContent = '\u00A0';
   }
 };
 
@@ -1795,7 +1945,7 @@ $('#btn-respi').addEventListener('click', () => {
 
 choixUnique('choix-rythme', (b) => {
   reglages.rythme = b.dataset.preset;
-  $('#desc-rythme').innerHTML = '<small>' + RYTHMES[reglages.rythme].description + '</small>';
+  ecrireSmall('#desc-rythme', RYTHMES[reglages.rythme].description);
   sauverReglages();
   if (respiration.enCours) { respiration.arreter(); respiration.demarrer(); }
 });
@@ -1890,7 +2040,7 @@ function lierCase(idChamp, cle, apres) {
    dans le calme, et jamais pendant une crise. */
 
 function majEtatPosition(texte) {
-  $('#r-position-etat').innerHTML = '<small>' + texte + '</small>';
+  ecrireSmall('#r-position-etat', texte);
 }
 
 function afficherEtatPosition() {
@@ -2034,7 +2184,7 @@ function initReglages() {
   marquer('choix-palette', 'palette', reglages.palette);
   marquer('choix-rythme', 'preset', reglages.rythme);
   marquer('choix-duree', 'min', reglages.dureeRespi);
-  $('#desc-rythme').innerHTML = '<small>' + RYTHMES[reglages.rythme].description + '</small>';
+  ecrireSmall('#desc-rythme', RYTHMES[reglages.rythme].description);
 }
 
 
@@ -2310,7 +2460,7 @@ function enregistrerProtocole(tout_de_suite) {
    ajouter une proposition dans la liste suffit à la faire apparaître. */
 function construireProtocole() {
   const conteneur = $('#protocole-themes');
-  conteneur.innerHTML = '';
+  conteneur.textContent = '';
 
   THEMES_PROTOCOLE.forEach((theme) => {
     const carte = document.createElement('section');
@@ -2322,8 +2472,9 @@ function construireProtocole() {
 
     if (theme.aide) {
       const aide = document.createElement('p');
-      aide.innerHTML = '<small></small>';
-      aide.firstChild.textContent = theme.aide;
+      const petit = document.createElement('small');
+      petit.textContent = theme.aide;
+      aide.appendChild(petit);
       carte.appendChild(aide);
     }
 
@@ -2357,7 +2508,7 @@ function construireProtocole() {
     const etiquette = document.createElement('label');
     etiquette.setAttribute('for', 'libre-' + theme.id);
     etiquette.textContent = 'Mes propres mots (une ligne par idée)';
-    etiquette.style.marginTop = '14px';
+    etiquette.className = 'etiquette-haut-14';
 
     const champ = document.createElement('textarea');
     champ.id = 'libre-' + theme.id;
@@ -2431,7 +2582,6 @@ function majResumeProtocole() {
   const resume = $('#p-resume').firstChild;
 
   bouton.disabled = total === 0;
-  bouton.style.opacity = total === 0 ? '0.5' : '';
 
   if (total === 0) {
     resume.textContent = "Coche au moins une ligne pour pouvoir créer ta carte.";
@@ -2461,17 +2611,18 @@ function nettoyerMonte(m) {
 
 function construireMonte() {
   const conteneur = $('#monte-themes');
-  conteneur.innerHTML = '';
+  conteneur.textContent = '';
 
   THEMES_MONTEE.forEach((theme) => {
     const titre = document.createElement('h3');
     titre.textContent = theme.titre;
-    titre.style.marginTop = '18px';
+    titre.className = 'titre-monte';
     conteneur.appendChild(titre);
 
     const aide = document.createElement('p');
-    aide.innerHTML = '<small></small>';
-    aide.firstChild.textContent = theme.aide;
+    const petit = document.createElement('small');
+    petit.textContent = theme.aide;
+    aide.appendChild(petit);
     conteneur.appendChild(aide);
 
     theme.propositions.forEach((prop) => {
@@ -2502,7 +2653,7 @@ function construireMonte() {
     const etiquette = document.createElement('label');
     etiquette.setAttribute('for', 'monte-libre-' + theme.id);
     etiquette.textContent = 'Mes propres mots (une ligne par idée)';
-    etiquette.style.marginTop = '14px';
+    etiquette.className = 'etiquette-haut-14';
 
     const champ = document.createElement('textarea');
     champ.id = 'monte-libre-' + theme.id;
@@ -2547,17 +2698,15 @@ function majEntreeMonte() {
   $('#btn-monte').classList.toggle('masque', !rempli || bouclierActif);
 }
 
-function ouvrirEcranMonte(ouvert) {
-  const ecran = $('#ecran-monte');
-  ecran.hidden = !ouvert;
+function ouvrirEcranMonte(ouvert, opts) {
   if (!ouvert) {
-    if ($('#btn-monte').offsetParent) $('#btn-monte').focus();
+    fermerModale(opts);
     return;
   }
   [['actions', '#monte-actions'], ['signes', '#monte-signes']].forEach(([id, sel]) => {
     const lignes = lignesMonte(id);
     const liste = $(sel);
-    liste.innerHTML = '';
+    liste.textContent = '';
     lignes.forEach((l) => {
       const li = document.createElement('li');
       li.textContent = l;
@@ -2569,20 +2718,22 @@ function ouvrirEcranMonte(ouvert) {
   const coches = protocole.monte.coches;
   $('#monte-respirer').classList.toggle('masque', !coches.includes('action-respirer'));
   $('#monte-bouclier').classList.toggle('masque', !coches.includes('action-bouclier'));
-  ecran.focus({ preventScroll: true });
-  ecran.scrollTop = 0;
-  annoncer('Quand ça monte.');
+  ouvrirModale($('#ecran-monte'), {
+    depuis: $('#btn-monte'),
+    focus: $('#ecran-monte'),
+    annonce: 'Quand ça monte.'
+  });
 }
 
 $('#btn-monte').addEventListener('click', () => ouvrirEcranMonte(true));
 $('#monte-fermer').addEventListener('click', () => ouvrirEcranMonte(false));
 $('#monte-respirer').addEventListener('click', () => {
-  ouvrirEcranMonte(false);
+  fermerModale({ restaurerFocus: false });
   allerA('respiration');
   if (!respiration.enCours) respiration.demarrer();
 });
 $('#monte-bouclier').addEventListener('click', () => {
-  ouvrirEcranMonte(false);
+  fermerModale({ restaurerFocus: false });
   activerBouclier(true);
   $('#btn-bouclier').focus();
 });
@@ -2760,24 +2911,25 @@ function ecrireCochesEmotions(coches) {
 
 let emotionOuverte = null;   /* l'id de l'émotion affichée, ou null */
 
-function ouvrirEcranEmotions(ouvert) {
-  const ecran = $('#ecran-emotions');
-  ecran.hidden = !ouvert;
+function ouvrirEcranEmotions(ouvert, opts) {
   if (!ouvert) {
-    emotionOuverte = null;
-    if ($('#btn-emotions').offsetParent) $('#btn-emotions').focus();
+    fermerModale(opts);
     return;
   }
   montrerChoixEmotions();
-  ecran.focus({ preventScroll: true });
-  annoncer('Ce que je ressens.');
+  ouvrirModale($('#ecran-emotions'), {
+    depuis: $('#btn-emotions'),
+    focus: $('#ecran-emotions'),
+    onClose: () => { emotionOuverte = null; },
+    annonce: 'Ce que je ressens.'
+  });
 }
 
 /* Premier temps : les émotions, en gros smileys. */
 function montrerChoixEmotions() {
   emotionOuverte = null;
   const grille = $('#emotions-grille');
-  grille.innerHTML = '';
+  grille.textContent = '';
   protocole.emotions.forEach((emotion, i) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -2806,7 +2958,7 @@ function montrerProcedure(id) {
   emotionOuverte = id;
 
   const titre = $('#procedure-titre');
-  titre.innerHTML = '';
+  titre.textContent = '';
   const smiley = document.createElement('span');
   smiley.className = 'smiley';
   smiley.setAttribute('aria-hidden', 'true');
@@ -2816,7 +2968,7 @@ function montrerProcedure(id) {
   const faites = lireCochesEmotions()[id] || [];
   const etapes = etapesRemplies(emotion);
   const zone = $('#procedure-etapes');
-  zone.innerHTML = '';
+  zone.textContent = '';
   etapes.forEach((etape, n) => {
     const ligne = document.createElement('label');
     ligne.className = 'proposition';
@@ -2871,7 +3023,7 @@ function construireReglagesEmotions() {
   const zone = $('#r-emotions');
   /* Les encadrés ouverts le restent quand on reconstruit. */
   const ouverts = new Set($$('#r-emotions details[open]').map((d) => d.dataset.id));
-  zone.innerHTML = '';
+  zone.textContent = '';
   protocole.emotions.forEach((emotion, i) => {
     zone.appendChild(carteReglageEmotion(emotion, i, ouverts.has(emotion.id)));
   });
@@ -2885,7 +3037,7 @@ function carteReglageEmotion(emotion, i, ouvert) {
 
   const resume = document.createElement('summary');
   const majResume = () => {
-    resume.innerHTML = '';
+    resume.textContent = '';
     const smiley = document.createElement('span');
     smiley.className = 'smiley-petit';
     smiley.setAttribute('aria-hidden', 'true');
@@ -2980,10 +3132,12 @@ function carteReglageEmotion(emotion, i, ouvert) {
   /* Redessine la liste. « focus » : [id de l'étape, action] du bouton à
      qui rendre la main, pour ne pas perdre sa place après un déplacement. */
   const dessinerEtapes = (focus) => {
-    liste.innerHTML = '';
+    liste.textContent = '';
     if (!emotion.etapes.length) {
       const vide = document.createElement('p');
-      vide.innerHTML = '<small>Aucune étape pour l\'instant.</small>';
+      const petit = document.createElement('small');
+      petit.textContent = "Aucune étape pour l'instant.";
+      vide.appendChild(petit);
       liste.appendChild(vide);
     }
     emotion.etapes.forEach((etape, n) => {
@@ -3066,7 +3220,7 @@ function carteReglageEmotion(emotion, i, ouvert) {
   const etiquetteAjout = document.createElement('label');
   etiquetteAjout.setAttribute('for', base + '-ajout');
   etiquetteAjout.textContent = 'Ajouter une étape';
-  etiquetteAjout.style.marginTop = '14px';
+  etiquetteAjout.className = 'etiquette-haut-14';
   const ligneAjout = document.createElement('div');
   ligneAjout.className = 'ajout-ligne';
   const champAjout = document.createElement('input');
@@ -3323,43 +3477,47 @@ function dessinerCarte(nomPalette) {
    sans refaire le dessin. */
 let imageCarte = null;   /* { blob, url } */
 
-function ouvrirEcranCarte(ouvert) {
-  const ecran = $('#ecran-carte');
-  ecran.hidden = !ouvert;
+function nettoyerEcranCarte() {
+  /* On libère l'image de la mémoire du navigateur. */
+  if (imageCarte && imageCarte.url) URL.revokeObjectURL(imageCarte.url);
+  imageCarte = null;
+  $('#apercu-carte').textContent = '';
+}
 
-  if (ouvert) {
-    /* On revient toujours sur l'avertissement : jamais directement
-       sur l'image de la fois précédente. */
-    $('#carte-etape-avis').classList.remove('masque');
-    $('#carte-etape-apercu').classList.add('masque');
-
-    const lignes = lignesProtocole();
-    const contact = ligneContact();
-    let detail = lignes.length + (lignes.length > 1 ? ' lignes' : ' ligne');
-    detail += contact ? ', puis « ' + contact + ' ».' : '.';
-    $('#carte-detail').textContent = detail;
-
-    /* Prévenir précisément quand un numéro figure sur la carte. */
-    $('#carte-avis-numero').classList
-      .toggle('masque', !(protocole.contactTel || '').trim());
-
-    ecran.focus({ preventScroll: true });
-    ecran.scrollTop = 0;
-    annoncer('Avant de créer la carte : ce texte sera visible par tout le monde.');
-  } else {
-    /* On libère l'image de la mémoire du navigateur. */
-    if (imageCarte && imageCarte.url) URL.revokeObjectURL(imageCarte.url);
-    imageCarte = null;
-    $('#apercu-carte').innerHTML = '';
-    $('#btn-creer-carte').focus();
+function ouvrirEcranCarte(ouvert, opts) {
+  if (!ouvert) {
+    fermerModale(opts);
+    return;
   }
+
+  /* On revient toujours sur l'avertissement : jamais directement
+     sur l'image de la fois précédente. */
+  $('#carte-etape-avis').classList.remove('masque');
+  $('#carte-etape-apercu').classList.add('masque');
+
+  const lignes = lignesProtocole();
+  const contact = ligneContact();
+  let detail = lignes.length + (lignes.length > 1 ? ' lignes' : ' ligne');
+  detail += contact ? ', puis « ' + contact + ' ».' : '.';
+  $('#carte-detail').textContent = detail;
+
+  /* Prévenir précisément quand un numéro figure sur la carte. */
+  $('#carte-avis-numero').classList
+    .toggle('masque', !(protocole.contactTel || '').trim());
+
+  ouvrirModale($('#ecran-carte'), {
+    depuis: $('#btn-creer-carte'),
+    focus: $('#ecran-carte'),
+    onClose: nettoyerEcranCarte,
+    annonce: 'Avant de créer la carte : ce texte sera visible par tout le monde.'
+  });
 }
 
 function fabriquerCarte() {
   const resultat = dessinerCarte(protocole.fond);
 
   const apercu = $('#apercu-carte');
-  apercu.innerHTML = '';
+  apercu.textContent = '';
   resultat.canvas.setAttribute('role', 'img');
   resultat.canvas.setAttribute('aria-label',
     'Aperçu de la carte : ' + TITRE_CARTE + ' ' + lignesProtocole().join('. '));
@@ -3379,6 +3537,7 @@ function fabriquerCarte() {
   $('#carte-etape-avis').classList.add('masque');
   $('#carte-etape-apercu').classList.remove('masque');
   $('#ecran-carte').scrollTop = 0;
+  $('#ecran-carte').focus({ preventScroll: true });
 
   /* On prépare tout de suite le fichier : le bouton « Partager » ne
      fonctionne, sur Android, que s'il n'attend rien. */
@@ -3452,35 +3611,47 @@ function urlHttps(brut) {
   }
 }
 
-let ouvreurLiens = null;   /* le bouton par lequel on est entré */
-
-function ouvrirEcranLiens(ouvert, depuis) {
-  const ecran = $('#ecran-liens');
-  ecran.hidden = !ouvert;
-  if (ouvert) {
-    ouvreurLiens = depuis || null;
-    afficherLiens();
-    ecran.focus({ preventScroll: true });
-    ecran.scrollTop = 0;
-    annoncer("Ce qui m'apaise.");
-  } else {
-    $('#l-erreur').classList.add('masque');
-    /* On revient sur le bouton d'où l'on vient — pas toujours celui de
-       l'accueil : la respiration en propose un aussi. */
-    if (ouvreurLiens && ouvreurLiens.offsetParent) ouvreurLiens.focus();
+function ouvrirEcranLiens(ouvert, depuis, opts) {
+  if (!ouvert) {
+    fermerModale(opts);
+    return;
   }
+  afficherLiens();
+  ouvrirModale($('#ecran-liens'), {
+    depuis: depuis || null,
+    focus: $('#ecran-liens'),
+    onClose: () => $('#l-erreur').classList.add('masque'),
+    annonce: "Ce qui m'apaise."
+  });
 }
 
 async function afficherLiens() {
   let liste = [];
-  try { liste = await BDD.liensTout(); } catch (e) { console.warn('Liens illisibles.', e); }
+  let lectureEchouee = false;
+  try {
+    liste = await BDD.liensTout();
+  } catch (e) {
+    console.warn('Liens illisibles.', e);
+    lectureEchouee = true;
+    const err = $('#l-erreur');
+    err.textContent = "La base locale est inaccessible : tes liens ne peuvent pas être affichés.";
+    err.classList.remove('masque');
+  }
 
   const conteneur = $('#liste-liens');
-  conteneur.innerHTML = '';
+  conteneur.textContent = '';
 
   if (liste.length === 0) {
-    conteneur.innerHTML = '<p class="vide">Aucun lien pour l\'instant.<br>'
-      + 'Ajoute-les au calme : ils seront là le jour où chercher sera trop dur.</p>';
+    if (!lectureEchouee) {
+      const p = document.createElement('p');
+      p.className = 'vide';
+      p.append(
+        document.createTextNode("Aucun lien pour l'instant."),
+        document.createElement('br'),
+        document.createTextNode('Ajoute-les au calme : ils seront là le jour où chercher sera trop dur.')
+      );
+      conteneur.appendChild(p);
+    }
     return;
   }
 
@@ -3549,7 +3720,13 @@ async function afficherLiens() {
         await BDD.liensSupprimer(lien.id);
         afficherLiens();
         annoncer('Lien supprimé.');
-      } catch (e) { console.warn('Suppression impossible.', e); }
+      } catch (e) {
+        console.warn('Suppression impossible.', e);
+        const err = $('#l-erreur');
+        err.textContent = "Le lien n'a pas pu être supprimé.";
+        err.classList.remove('masque');
+        annoncer("Le lien n'a pas pu être supprimé.");
+      }
     });
 
     rangee.appendChild(ouvrir);
@@ -3669,22 +3846,23 @@ function majBoutonProches() {
 
 /* --- L'écran plein --- */
 
-function ouvrirEcranProches(ouvert) {
-  const ecran = $('#ecran-proches');
-  ecran.hidden = !ouvert;
+function ouvrirEcranProches(ouvert, opts) {
   if (!ouvert) {
-    if ($('#btn-proches').offsetParent) $('#btn-proches').focus();
+    fermerModale(opts);
     return;
   }
   montrerContactsProches();
-  ecran.focus({ preventScroll: true });
-  annoncer('Écrire à un proche.');
+  ouvrirModale($('#ecran-proches'), {
+    depuis: $('#btn-proches'),
+    focus: $('#ecran-proches'),
+    annonce: 'Écrire à un proche.'
+  });
 }
 
 /* Premier temps : un bouton par contact. */
 function montrerContactsProches() {
   const zone = $('#proches-contacts');
-  zone.innerHTML = '';
+  zone.textContent = '';
   reglages.contacts.filter(contactJoignable).forEach((contact) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -3712,7 +3890,7 @@ function montrerMessagesProche(id) {
 
   const messages = messagesRemplis(contact);
   const zone = $('#proches-messages');
-  zone.innerHTML = '';
+  zone.textContent = '';
   messages.forEach((m) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -3745,10 +3923,12 @@ $('#proches-retour').addEventListener('click', () => {
 function construireReglagesProches() {
   const zone = $('#r-proches');
   const ouverts = new Set($$('#r-proches details[open]').map((d) => d.dataset.id));
-  zone.innerHTML = '';
+  zone.textContent = '';
   if (!reglages.contacts.length) {
     const vide = document.createElement('p');
-    vide.innerHTML = "<small>Aucun contact pour l'instant.</small>";
+    const petit = document.createElement('small');
+    petit.textContent = "Aucun contact pour l'instant.";
+    vide.appendChild(petit);
     zone.appendChild(vide);
   }
   reglages.contacts.forEach((contact) => {
@@ -3765,7 +3945,7 @@ function carteReglageProche(contact, ouvert) {
 
   const resume = document.createElement('summary');
   const majResume = () => {
-    resume.innerHTML = '';
+    resume.textContent = '';
     const nom = document.createElement('span');
     nom.textContent = nomContact(contact);
     const total = messagesRemplis(contact).length;
@@ -3824,10 +4004,12 @@ function carteReglageProche(contact, ouvert) {
   dedans.append(titre, liste);
 
   const dessinerMessages = () => {
-    liste.innerHTML = '';
+    liste.textContent = '';
     if (!contact.messages.length) {
       const vide = document.createElement('p');
-      vide.innerHTML = "<small>Aucun message pour l'instant.</small>";
+      const petit = document.createElement('small');
+      petit.textContent = "Aucun message pour l'instant.";
+      vide.appendChild(petit);
       liste.appendChild(vide);
     }
     contact.messages.forEach((m, n) => {
@@ -3870,7 +4052,7 @@ function carteReglageProche(contact, ouvert) {
   const etiquetteAjout = document.createElement('label');
   etiquetteAjout.setAttribute('for', base + '-ajout');
   etiquetteAjout.textContent = 'Ajouter un message';
-  etiquetteAjout.style.marginTop = '14px';
+  etiquetteAjout.className = 'etiquette-haut-14';
   const champAjout = document.createElement('textarea');
   champAjout.id = base + '-ajout';
   champAjout.className = 'champ-libre';
@@ -3878,7 +4060,7 @@ function carteReglageProche(contact, ouvert) {
   const boutonAjout = document.createElement('button');
   boutonAjout.type = 'button';
   boutonAjout.textContent = 'Ajouter ce message';
-  boutonAjout.style.margin = '8px 0 16px';
+  boutonAjout.className = 'btn-ajout-message';
   boutonAjout.addEventListener('click', () => {
     const texte = champAjout.value.trim();
     if (!texte) { champAjout.focus(); return; }
@@ -3897,7 +4079,7 @@ function carteReglageProche(contact, ouvert) {
   const supprimerContact = document.createElement('button');
   supprimerContact.type = 'button';
   supprimerContact.textContent = 'Supprimer ce contact';
-  supprimerContact.style.marginBottom = '10px';
+  supprimerContact.className = 'btn-supprimer-contact';
   deuxAppuis(supprimerContact, 'Confirmer : supprimer ' + nomContact(contact), () => {
     reglages.contacts = reglages.contacts.filter((c) => c !== contact);
     sauverReglages();
@@ -4013,7 +4195,8 @@ function afficherDerniereSauvegarde() {
     : "Aucune sauvegarde faite depuis ce téléphone pour l'instant.";
 }
 
-async function enregistrerSauvegarde() {
+async function enregistrerSauvegarde(notifier = messageSauvegarde) {
+  const afficherMessage = typeof notifier === 'function' ? notifier : messageSauvegarde;
   let crises, liens;
   try {
     crises = await BDD.tout();
@@ -4022,7 +4205,7 @@ async function enregistrerSauvegarde() {
     /* Mieux vaut ne rien fabriquer qu'un fichier incomplet qu'on
        croirait complet. */
     console.error(e);
-    messageSauvegarde("La sauvegarde n'a pas pu être faite : la base locale est illisible.");
+    afficherMessage("La sauvegarde n'a pas pu être faite : la base locale est illisible.");
     annoncer('Sauvegarde impossible.');
     return;
   }
@@ -4057,11 +4240,11 @@ async function enregistrerSauvegarde() {
       ? ' Attention : tes ' + nbVoix + ' notes vocales ne sont pas dans ce fichier. Elles restent seulement sur ce téléphone.'
       : " Attention : ta note vocale n'est pas dans ce fichier. Elle reste seulement sur ce téléphone.";
   }
-  messageSauvegarde(texte);
+  afficherMessage(texte);
   annoncer('Sauvegarde enregistrée.' + (nbVoix ? ' Les notes vocales ne sont pas dedans.' : ''));
 }
 
-$('#btn-sauvegarder').addEventListener('click', enregistrerSauvegarde);
+$('#btn-sauvegarder').addEventListener('click', () => enregistrerSauvegarde(messageSauvegarde));
 
 /* --- Vérification de ce qui vient du fichier --- */
 
@@ -4360,7 +4543,7 @@ async function demarrer() {
     navigator.serviceWorker.addEventListener('message', (e) => {
       if (e.data && e.data.type === 'recharger') location.reload();
     });
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
       .then(surveillerMisesAJour)
       .catch((e) => console.warn('Mode hors-ligne indisponible.', e));
   }

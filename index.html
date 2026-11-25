@@ -2,6 +2,7 @@
 <html lang="fr" data-theme="sombre">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; manifest-src 'self'; worker-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Refuge</title>
 <meta name="description" content="Un refuge sensoriel de poche pour les crises de surcharge.">
@@ -9,26 +10,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
-<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <!-- Pose le thème, la gamme de couleurs, la taille du texte et le bouclier
      AVANT le premier affichage : sans cela, l'écran s'allume une fraction
      de seconde avec les couleurs par défaut. En bouclier, ce serait un
      éclair de lumière au pire moment. app.js refait ensuite la même chose. -->
-<script>
-(function () {
-  try {
-    var r = JSON.parse(localStorage.getItem('refuge.reglages')) || {};
-    var racine = document.documentElement;
-    racine.dataset.theme = r.themeClair ? 'clair' : 'sombre';
-    if (typeof r.palette === 'string') racine.dataset.palette = r.palette;
-    var echelle = Number(r.echelle);
-    if (echelle >= 0.5 && echelle <= 2) racine.style.setProperty('--echelle', echelle);
-    if (r.bouclierAuDemarrage || new URLSearchParams(location.search).get('mode') === 'bouclier') {
-      racine.dataset.bouclier = 'on';
-    }
-  } catch (e) { /* réglages illisibles : on garde le thème par défaut */ }
-})();
-</script>
+<script src="./theme-init.js"></script>
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -42,13 +29,14 @@
        VUE 1 — ACCUEIL (mode crise, priorité absolue)
        ======================================================== -->
   <section id="vue-accueil" class="vue active" role="tabpanel" aria-labelledby="onglet-accueil">
+    <h1 class="annonce">Refuge</h1>
 
     <button id="btn-aide" class="bouton-aide">
       J'AI BESOIN D'AIDE
       <span class="sous" id="btn-aide-sous">Prévenir mon contact</span>
     </button>
 
-    <div class="bouton-rangee" style="margin-bottom:16px">
+    <div class="bouton-rangee">
       <button id="btn-bouclier" class="bouton-doux" aria-pressed="false">
         Bouclier sensoriel
       </button>
@@ -60,24 +48,24 @@
     <!-- Messages préparés pour mes proches. N'apparaît que si au moins un
          contact a un numéro (Réglages). Reste là en bouclier : écrire à
          quelqu'un sans parler est justement utile à ce moment-là. -->
-    <button id="btn-proches" class="masque" style="margin-bottom:16px">Écrire à un proche</button>
+    <button id="btn-proches" class="masque">Écrire à un proche</button>
 
-    <button id="btn-respirer-vite" style="margin-bottom:16px">Respirer avec moi</button>
+    <button id="btn-respirer-vite">Respirer avec moi</button>
 
     <!-- Procédures par émotion : préparées au calme dans les Réglages.
          Reste visible en bouclier : l'écran est fait pour y être lu. -->
-    <button id="btn-emotions" style="margin-bottom:16px">Ce que je ressens</button>
+    <button id="btn-emotions">Ce que je ressens</button>
 
     <!-- Ce que la personne a préparé au calme pour le moment où ça monte.
          N'apparaît que si elle l'a rempli (onglet Protocole), et disparaît
          en bouclier, comme les liens apaisants. -->
-    <button id="btn-monte" class="masque" style="margin-bottom:16px">Quand ça monte</button>
+    <button id="btn-monte" class="masque">Quand ça monte</button>
 
-    <button id="btn-urgences" style="margin-bottom:16px">Numéros d'urgence</button>
+    <button id="btn-urgences">Numéros d'urgence</button>
 
     <!-- Entrée vers les liens apaisants. Masquée dès que le bouclier
          sensoriel s'allume : en crise, on ne propose plus d'écrans. -->
-    <button id="btn-liens" class="entree-liens" style="margin-bottom:16px">Ce qui m'apaise</button>
+    <button id="btn-liens" class="entree-liens">Ce qui m'apaise</button>
 
     <!-- Guides affichés uniquement quand le bouclier est actif.
          lisible-en-bouclier : les mêmes gris que le Journal en bouclier, un
@@ -130,13 +118,13 @@
   <section id="vue-journal" class="vue lisible-en-bouclier" role="tabpanel" aria-labelledby="onglet-journal" hidden>
     <h1>Journal</h1>
 
-    <button id="btn-noter-vite" class="bouton-doux" style="margin-bottom:8px">
+    <button id="btn-noter-vite" class="bouton-doux">
       Noter une crise maintenant
     </button>
     <p><small>Un seul appui : seule l'heure est enregistrée. Tu pourras
        compléter plus tard, quand tu en auras l'énergie.</small></p>
 
-    <button id="btn-nouvelle" style="margin-bottom:18px">
+    <button id="btn-nouvelle">
       Enregistrer une crise en détail
     </button>
 
@@ -145,7 +133,7 @@
     <!-- Ce qui revient le plus souvent, calculé sur ce téléphone. -->
     <div id="bilan-journal" class="carte masque">
       <h3>Ces trois derniers mois</h3>
-      <p id="bilan-texte" style="margin-bottom:0"></p>
+      <p id="bilan-texte"></p>
     </div>
 
     <!-- Formulaire d'ajout, masqué par défaut -->
@@ -155,8 +143,8 @@
       <label for="f-date">Date et heure</label>
       <input type="datetime-local" id="f-date" required>
 
-      <label for="f-duree">Durée</label>
-      <div class="choix" id="f-duree" role="group" aria-label="Durée de la crise">
+      <p id="f-duree-titre" class="etiquette">Durée</p>
+      <div class="choix" id="f-duree" role="group" aria-labelledby="f-duree-titre">
         <button type="button" data-val="5">5 min</button>
         <button type="button" data-val="15">15 min</button>
         <button type="button" data-val="30">30 min</button>
@@ -164,8 +152,8 @@
         <button type="button" data-val="120">2 h +</button>
       </div>
 
-      <label for="f-intensite">Intensité ressentie</label>
-      <div class="choix" id="f-intensite" role="group" aria-label="Intensité de 1 à 5">
+      <p id="f-intensite-titre" class="etiquette">Intensité ressentie</p>
+      <div class="choix" id="f-intensite" role="group" aria-labelledby="f-intensite-titre">
         <button type="button" data-val="1" aria-label="1 sur 5, très légère">1</button>
         <button type="button" data-val="2" aria-label="2 sur 5">2</button>
         <button type="button" data-val="3" aria-label="3 sur 5">3</button>
@@ -173,10 +161,10 @@
         <button type="button" data-val="5" aria-label="5 sur 5, très forte">5</button>
       </div>
 
-      <label>Déclencheurs</label>
+      <p id="f-declencheurs-titre" class="etiquette">Déclencheurs</p>
       <!-- Les boutons sont construits par app.js : la liste de base
            (DECLENCHEURS), puis les déclencheurs personnels. -->
-      <div class="choix" id="f-declencheurs" role="group" aria-label="Déclencheurs possibles"></div>
+      <div class="choix" id="f-declencheurs" role="group" aria-labelledby="f-declencheurs-titre"></div>
 
       <label for="f-autre-declencheur">Un autre déclencheur, à garder pour la suite</label>
       <div class="ajout-ligne">
@@ -245,7 +233,7 @@
     <p id="consigne" class="consigne">Quand tu veux</p>
     <p id="compteur" class="compteur">&nbsp;</p>
 
-    <button id="btn-respi" class="bouton-doux" style="margin-bottom:20px">Commencer</button>
+    <button id="btn-respi" class="bouton-doux">Commencer</button>
 
     <div class="carte">
       <h3>Rythme</h3>
@@ -268,7 +256,7 @@
       </div>
     </div>
 
-    <button type="button" class="entree-liens" style="margin-bottom:16px">Ce qui m'apaise</button>
+    <button type="button" class="entree-liens">Ce qui m'apaise</button>
 
     <p><small>Si suivre le cercle demande trop d'effort, ferme les yeux et
        suis seulement les mots. Si c'est encore trop, pose le téléphone :
@@ -367,7 +355,7 @@
       <label for="r-tel">Son numéro</label>
       <input type="tel" id="r-tel" placeholder="06 12 34 56 78" autocomplete="tel">
 
-      <button type="button" id="btn-choisir-contact" class="masque" style="margin-bottom:16px">
+      <button type="button" id="btn-choisir-contact" class="masque">
         Choisir dans mes contacts
       </button>
 
@@ -400,13 +388,13 @@
          partent sans position.</small></p>
       <div id="r-proches"></div>
 
-      <h3 style="margin-top:18px">Ajouter un contact</h3>
+      <h3 class="sous-titre-carte">Ajouter un contact</h3>
       <label for="r-proche-nom">Son nom</label>
       <input type="text" id="r-proche-nom" maxlength="40" placeholder="Par exemple : Sam">
       <label for="r-proche-tel">Son numéro</label>
       <input type="tel" id="r-proche-tel" maxlength="30" placeholder="06 12 34 56 78">
       <p id="r-proche-erreur" class="avis masque" role="status"></p>
-      <button type="button" id="r-proche-ajouter" class="bouton-doux" style="margin-bottom:12px">Ajouter ce contact</button>
+      <button type="button" id="r-proche-ajouter" class="bouton-doux">Ajouter ce contact</button>
       <button type="button" id="r-proche-reprendre">Reprendre mon contact d'urgence</button>
     </div>
 
@@ -436,45 +424,45 @@
         <input type="checkbox" id="r-ecran-allume">
       </label>
 
-      <h3 style="margin-top:18px">Couleurs</h3>
+      <h3 class="sous-titre-carte">Couleurs</h3>
       <div class="palette-grille" id="choix-palette" role="group" aria-label="Gamme de couleurs">
         <button type="button" class="palette-carte" data-palette="refuge">
-          <span class="pastille" style="background:#7ea8a0"></span>
+          <span class="pastille"></span>
           Refuge
         </button>
         <button type="button" class="palette-carte" data-palette="bleu">
-          <span class="pastille" style="background:#9dbcd0"></span>
+          <span class="pastille"></span>
           Bleu-gris
         </button>
         <button type="button" class="palette-carte" data-palette="sauge">
-          <span class="pastille" style="background:#a5ccb4"></span>
+          <span class="pastille"></span>
           Sauge
         </button>
         <button type="button" class="palette-carte" data-palette="lavande">
-          <span class="pastille" style="background:#c0b6e6"></span>
+          <span class="pastille"></span>
           Lavande
         </button>
         <button type="button" class="palette-carte" data-palette="sable">
-          <span class="pastille" style="background:#b89a7a"></span>
+          <span class="pastille"></span>
           Sable
         </button>
         <button type="button" class="palette-carte" data-palette="peche">
-          <span class="pastille" style="background:#ddb8a3"></span>
+          <span class="pastille"></span>
           Pêche
         </button>
         <button type="button" class="palette-carte" data-palette="miel">
-          <span class="pastille" style="background:#d6c19f"></span>
+          <span class="pastille"></span>
           Miel
         </button>
         <button type="button" class="palette-carte" data-palette="rose">
-          <span class="pastille" style="background:#daabb5"></span>
+          <span class="pastille"></span>
           Rose poudré
         </button>
       </div>
       <p><small>Des couleurs douces et peu saturées, en sombre comme en
          clair. Le bouclier sensoriel, lui, reste toujours noir.</small></p>
 
-      <h3 style="margin-top:18px">Taille du texte</h3>
+      <h3 class="sous-titre-carte">Taille du texte</h3>
       <div class="choix" id="choix-taille" role="group" aria-label="Taille du texte">
         <button type="button" data-echelle="0.9">Petit</button>
         <button type="button" data-echelle="1" aria-pressed="true">Normal</button>
@@ -499,7 +487,7 @@
       </label>
 
       <p id="r-position-etat"><small></small></p>
-      <button type="button" id="btn-tester-position" style="margin-bottom:16px">
+      <button type="button" id="btn-tester-position">
         Tester ma position
       </button>
 
@@ -530,7 +518,7 @@
       <p><small>C'est pour toi : rien de tout cela ne va sur la carte de
          l'écran verrouillé.</small></p>
       <div id="r-emotions"></div>
-      <button type="button" id="r-emotions-defaut" style="margin-top:8px">Remettre les exemples de départ</button>
+      <button type="button" id="r-emotions-defaut">Remettre les exemples de départ</button>
     </div>
 
     <div class="carte">
@@ -564,7 +552,7 @@
          données de Refuge sont effacées ou si tu changes de téléphone, les
          enregistrements de ta voix seront perdus.</p>
 
-      <button type="button" id="btn-sauvegarder" class="bouton-doux" style="margin-bottom:12px">
+      <button type="button" id="btn-sauvegarder" class="bouton-doux">
         Enregistrer une sauvegarde
       </button>
       <p id="derniere-sauvegarde"><small></small></p>
@@ -574,14 +562,14 @@
            plus grand et plus lisible, l'ouvre à sa place. -->
       <input type="file" id="fichier-restaurer" accept=".json,application/json" hidden>
 
-      <div id="restaurer-confirmation" class="avis masque" style="margin-top:16px">
-        <p id="restaurer-resume" style="margin-bottom:12px"></p>
+      <div id="restaurer-confirmation" class="avis masque">
+        <p id="restaurer-resume"></p>
         <div class="bouton-rangee">
           <button type="button" id="btn-restaurer-annuler">Annuler</button>
           <button type="button" id="btn-restaurer-confirmer" class="bouton-doux">Restaurer</button>
         </div>
       </div>
-      <p id="restaurer-message" class="avis masque" role="status" style="margin-top:16px"></p>
+      <p id="restaurer-message" class="avis masque" role="status"></p>
     </div>
 
     <div class="carte">
@@ -591,7 +579,7 @@
          Cette application n'est pas un dispositif médical et ne remplace ni un
          professionnel, ni les secours (15, 112).</small></p>
 
-      <button type="button" id="btn-urgences-reglages" style="margin-bottom:16px">
+      <button type="button" id="btn-urgences-reglages">
         Numéros d'urgence
       </button>
       <p><small>La même liste que depuis l'écran d'accueil. Lis-la une fois au
@@ -626,7 +614,7 @@
          Tes retours sont les bienvenus, à ton rythme, même en quelques mots.
          Écris à :
          <span class="adresse-mail">omni-systeme.choking513@passmail.net</span></small></p>
-      <a class="bouton" style="margin-bottom:16px"
+      <a class="bouton"
          href="mailto:omni-systeme.choking513@passmail.net?subject=Retour%20sur%20Refuge">
         Envoyer un retour par e-mail
       </a>
@@ -667,7 +655,7 @@
 </nav>
 
 <!-- ====== Carte de communication plein écran ====== -->
-<div id="carte-sos" class="carte-sos" hidden role="dialog" aria-modal="true" aria-label="Message à montrer">
+<div id="carte-sos" class="carte-sos" hidden tabindex="-1" role="dialog" aria-modal="true" aria-label="Message à montrer">
   <p class="message" id="sos-message"></p>
   <!-- Phrases courtes, seulement pour « Montrer un message » : une phrase
        touchée s'affiche en grand à la place du message. Elles ne déclenchent
@@ -681,9 +669,9 @@
       <p id="sos-position-texte"></p>
       <button type="button" id="sos-position-retirer" class="masque"></button>
     </div>
-    <button type="button" id="sos-envoyer" class="bouton-doux masque" style="margin-bottom:12px"></button>
-    <button type="button" id="sos-appeler" class="masque" style="margin-bottom:12px"></button>
-    <button type="button" id="sos-contraste" style="margin-bottom:12px" aria-pressed="false">
+    <button type="button" id="sos-envoyer" class="bouton-doux masque"></button>
+    <button type="button" id="sos-appeler" class="masque"></button>
+    <button type="button" id="sos-contraste" aria-pressed="false">
       Éclaircir pour le montrer
     </button>
     <button type="button" id="sos-fermer">Fermer</button>
@@ -794,10 +782,10 @@
 
     <p id="carte-alerte" class="avis masque" role="status"></p>
 
-    <button type="button" id="carte-telecharger" class="bouton-doux" style="margin-bottom:12px">
+    <button type="button" id="carte-telecharger" class="bouton-doux">
       Télécharger l'image
     </button>
-    <button type="button" id="carte-partager" class="masque" style="margin-bottom:12px">
+    <button type="button" id="carte-partager" class="masque">
       Partager l'image
     </button>
 
@@ -881,8 +869,8 @@
   </div>
 
   <div class="pied">
-    <button type="button" id="monte-respirer" class="bouton-doux masque" style="margin-bottom:12px">Respirer avec moi</button>
-    <button type="button" id="monte-bouclier" class="masque" style="margin-bottom:12px">Allumer le bouclier sensoriel</button>
+    <button type="button" id="monte-respirer" class="bouton-doux masque">Respirer avec moi</button>
+    <button type="button" id="monte-bouclier" class="masque">Allumer le bouclier sensoriel</button>
     <button type="button" id="monte-fermer">Fermer</button>
   </div>
 </div>
@@ -910,8 +898,8 @@
     <div id="procedure-etapes"></div>
     <p id="procedure-vide" class="intro masque">Aucune étape pour
        l'instant. Tu pourras en ajouter au calme, dans les Réglages.</p>
-    <button type="button" id="procedure-decocher" style="margin-top:16px">Tout décocher</button>
-    <button type="button" id="procedure-retour" class="bouton-doux" style="margin-top:12px">Choisir une autre émotion</button>
+    <button type="button" id="procedure-decocher">Tout décocher</button>
+    <button type="button" id="procedure-retour" class="bouton-doux">Choisir une autre émotion</button>
   </div>
 
   <div class="pied">
@@ -942,7 +930,7 @@
     <div id="proches-messages" class="liste-boutons"></div>
     <p id="proches-aucun" class="intro masque">Aucun message préparé pour ce
        contact. Tu pourras en ajouter au calme, dans les Réglages.</p>
-    <button type="button" id="proches-retour" class="bouton-doux" style="margin-top:4px">Choisir un autre contact</button>
+    <button type="button" id="proches-retour" class="bouton-doux">Choisir un autre contact</button>
   </div>
 
   <div class="pied">

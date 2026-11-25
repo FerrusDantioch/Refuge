@@ -3,18 +3,21 @@
    En crise, on ne peut pas dépendre du réseau : tout est mis en cache
    la première fois, puis servi depuis le téléphone. */
 
-const CACHE = 'refuge-v31';
+const CACHE = 'refuge-v32';
 
 /* La liste des fichiers indispensables au fonctionnement hors-ligne. */
 const FICHIERS = [
   './',
   './index.html',
+  './theme-init.js',
   './styles.css',
   './app.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  './maskable-512.png'
+  './maskable-192.png',
+  './maskable-512.png',
+  './apple-touch-icon.png'
 ];
 
 /* NOUVELLE VERSION : JAMAIS SANS L'ACCORD DE LA PERSONNE
@@ -121,14 +124,33 @@ self.addEventListener('message', (e) => {
       à rien dans le cache, et le raccourci « Bouclier » échouait hors-ligne. */
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
   e.respondWith((async () => {
     const enService = (await versionEnService()) || CACHE;
     const copie = await caches.open(enService);
     let rep = await copie.match(e.request, { ignoreSearch: true });
-    if (!rep && enService !== CACHE) rep = await (await caches.open(CACHE)).match(e.request, { ignoreSearch: true });
+    if (!rep && enService !== CACHE) {
+      rep = await (await caches.open(CACHE)).match(e.request, { ignoreSearch: true });
+    }
     if (rep) return rep;
-    rep = await fetch(e.request);
-    if (rep && rep.status === 200 && rep.type === 'basic') copie.put(e.request, rep.clone());
-    return rep;
+    try {
+      rep = await fetch(e.request);
+      if (rep && rep.status === 200 && rep.type === 'basic') {
+        copie.put(e.request, rep.clone()).catch(() => {});
+      }
+      return rep;
+    } catch (err) {
+      if (e.request.mode === 'navigate') {
+        const repli = (await copie.match('./index.html'))
+          || (await (await caches.open(CACHE)).match('./index.html'));
+        if (repli) return repli;
+      }
+      return new Response('Hors ligne', {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
+    }
   })());
 });
