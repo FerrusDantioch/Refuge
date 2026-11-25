@@ -16,26 +16,23 @@ Durée estimée : **rapide** (moins d'une heure), **moyen** (une demi-journée),
       3 minutes sans toucher le téléphone : l'écran doit rester allumé
       jusqu'à « C'est fini », puis s'éteindre normalement.
       ✅ Vérifié sur le téléphone de Johan le 21 octobre 2026 : ça fonctionne.
-- [ ] **Bouton « retour » d'Android**. Avec Refuge installée, ouvrir
-      « Montrer un message », puis faire le geste retour. Si toute
-      l'application se ferme au lieu du seul message, c'est le point 1
-      ci-dessous.
+- [x] **Bouton « retour » d'Android** *(réglé en novembre 2026, `refuge-v32`,
+      vérifié en tests automatisés — confirmation sur téléphone recommandée)*.
+      Avec Refuge installée, ouvrir « Montrer un message », puis faire le geste
+      retour : l'écran plein écran se referme sans fermer l'application.
 
 ---
 
 ## Important
 
-### 1. Le bouton « retour » d'Android ferme toute l'application — *moyen*
+### 1. Le bouton « retour » d'Android ferme toute l'application — *moyen* — ✅ *réglé en novembre 2026 (`refuge-v32`)*
 
-- **Problème** : Refuge n'inscrit rien dans l'historique de navigation. Le
-  geste retour ferme donc l'application entière, au lieu de fermer l'écran
-  plein écran ouvert (message, numéros d'urgence, liens, carte, « Quand ça
-  monte »).
-- **Piste** : inscrire chaque ouverture d'écran plein écran dans
-  l'historique (`history.pushState`) et le refermer sur l'événement
-  `popstate`, comme le fait l'application Prompteur Créateurs.
-- **Attention** : cela touche toute la navigation. Tester longuement :
-  envoi du SMS, appel, rechargement après une restauration, bouclier.
+- ✅ *Réglé en novembre 2026 (`refuge-v32`).* L'ouverture de chacun des
+  7 écrans modaux plein écran (`#carte-sos`, `#carte-urgences`, `#ecran-carte`,
+  `#ecran-liens`, `#ecran-monte`, `#ecran-emotions`, `#ecran-proches`) inscrit
+  désormais un état dans l'historique (`history.pushState`) et le referme
+  proprement sur `popstate`, sans casser l'envoi SMS, l'appel, la
+  restauration ni le bouclier sensoriel.
 
 ### 2. Une adresse à part pour Refuge — *long*
 
@@ -58,35 +55,33 @@ Durée estimée : **rapide** (moins d'une heure), **moyen** (une demi-journée),
 
 ## Mineur
 
-### 3. Clavier — *rapide à moyen*
-- La touche Échap ne ferme pas les écrans plein écran.
-- La touche Tab sort de ces écrans vers des boutons cachés derrière.
-- En bouclier, le cadre qui montre l'élément sélectionné est presque
-  invisible : la couleur `--accent` du bouclier n'a qu'un contraste de 2,3
-  sur le noir.
+### 3. Clavier — *rapide à moyen* — ✅ *réglé en novembre 2026 (`refuge-v32`)*
+- ✅ *Réglé en novembre 2026 (`refuge-v32`).* La touche `Échap` ferme les
+  7 écrans modaux plein écran, `Tab`/`Shift+Tab` reste piégé à l'intérieur
+  (avec `inert` sur `<main>` et `<nav>`), et le focus revient au bouton
+  ouvreur. En mode bouclier, le contour `:focus-visible` passe à `#5a5a5a`
+  (contraste > 3:1 sur `#000000`).
 
-### 4. Lecteurs d'écran — *rapide*
-- L'accueil n'a pas de titre (`<h1>`).
-- Dans le formulaire du journal, les étiquettes « Durée » et
-  « Déclencheurs » ne sont pas reliées à leurs groupes de boutons. La
-  première pointe vers un `<div>`, la seconde n'a pas d'attribut `for`.
+### 4. Lecteurs d'écran — *rapide* — ✅ *réglé en novembre 2026 (`refuge-v32`)*
+- ✅ *Réglé en novembre 2026 (`refuge-v32`).* L'accueil dispose désormais d'un
+  `<h1>` dédié, et les groupes « Durée », « Intensité ressentie » et
+  « Déclencheurs » du journal sont reliés à leurs titres via `aria-labelledby`.
 
-### 5. Thème clair : petits textes gris un peu pâles — *rapide*
-- Les textes gris (`--texte-doux`) sont légèrement sous la norme
-  d'accessibilité, qui demande un contraste de 4,5 : 4,3 sur les cartes,
-  3,8 à 4,0 sur les boutons.
-- Les thèmes sombres sont bons (5,2 à 12,9).
+### 5. Thème clair : petits textes gris un peu pâles — *rapide* — ✅ *réglé en novembre 2026 (`refuge-v32`)*
+- ✅ *Réglé en novembre 2026 (`refuge-v32`).* `--texte-doux` a été assombri
+  sur les 8 thèmes clairs (≥ 4,5:1 sur `--bg`, `--surface`, `--surface-2`
+  et `--accent-fond`).
 
-### 6. Très petit téléphone — *rapide*
-- À 320 px de large, avec le texte « Très grand », l'onglet « Réglages »
-  est coupé (27 px de trop). Tout va bien à partir de 360 px.
+### 6. Très petit téléphone — *rapide* — ✅ *réglé en novembre 2026 (`refuge-v32`)*
+- ✅ *Réglé en novembre 2026 (`refuge-v32`).* À 320 px de large avec le
+  texte « Très grand », les 5 onglets (y compris « Réglages ») tiennent sans
+  débordement tout en conservant une hauteur tactile ≥ 68 px.
 
-### 7. Messages d'erreur manquants — *rapide*
-- Si la base locale échoue, « Supprimer » une entrée du journal et
-  « Exporter (CSV) » n'affichent aucun message (`afficherCrises` et
-  `#btn-export-csv` dans `app.js`). C'est très rare.
-- Une adresse avec un `?vue=` inconnu (par exemple
-  `index.html?vue=abc`) affiche un écran vide.
+### 7. Messages d'erreur manquants — *rapide* — ✅ *réglé en novembre 2026 (`refuge-v32`)*
+- ✅ *Réglé en novembre 2026 (`refuge-v32`).* Les échecs IndexedDB lors de la
+  suppression (`afficherCrises`), de l'export CSV (`#btn-export-csv`), de la
+  lecture du journal et de la suppression d'un lien affichent désormais un
+  message clair ; un `?vue=` inconnu se replie proprement sur l'accueil.
 
 ### 8. Petits textes — *rapide* — ✅ *réglé en octobre 2026*
 - ✅ *Réglé en octobre 2026.* Les apostrophes étaient mélangées (’ et ') :
@@ -99,13 +94,14 @@ Durée estimée : **rapide** (moins d'une heure), **moyen** (une demi-journée),
   médical. Cette catégorie est retirée ; restent « health » et
   « lifestyle ».
 
-### 9. Garantir « rien ne sort du téléphone » par construction — *moyen*
-- **Piste** : ajouter dans `index.html` une règle de sécurité (CSP,
-  *Content-Security-Policy*) qui interdit au navigateur d'envoyer quoi que
-  ce soit vers un autre site.
-- **Attention** : il faut d'abord retirer les styles écrits directement
-  dans le HTML (`style="…"`) et autoriser le petit script du `<head>`.
-  Sinon, la règle bloquerait l'application elle-même.
+### 9. Garantir « rien ne sort du téléphone » par construction — *moyen* — ✅ *réglé en novembre 2026 (`refuge-v32`)*
+- ✅ *Réglé en novembre 2026 (`refuge-v32`).* Le script d'amorce du `<head>`
+  est extrait dans `theme-init.js`, les 43 attributs `style="…"` ont été
+  remplacés par des règles dans `styles.css`, et une politique CSP stricte
+  (`default-src 'none'`, `script-src 'self'`, `style-src 'self'`, `img-src 'self'`,
+  `connect-src 'self'`, `media-src 'self' blob:`, `object-src 'none'`,
+  `base-uri 'none'`, `manifest-src 'self'`, `worker-src 'self'`) est en place
+  dans `index.html`.
 
 ---
 
@@ -122,10 +118,9 @@ Durée estimée : **rapide** (moins d'une heure), **moyen** (une demi-journée),
 
 ## À savoir avant de toucher au manifest
 
-`manifest.json` n'a pas de champ `id`. Pour Chrome, l'identité de
-l'application est donc l'adresse complète de son `start_url` :
-`https://ferrusdantioch.github.io/Refuge/index.html`. **Ne jamais changer
-`start_url`.** Si un jour on ajoute un `id`, il doit donner exactement cette
-même adresse (`"id": "/Refuge/index.html"`). Sinon, pour les téléphones où
+`manifest.json` fixe désormais explicitement `"id": "/Refuge/index.html"` tout
+en conservant `"start_url": "./index.html"`. Pour Chrome, l'identité de
+l'application reste exactement `https://ferrusdantioch.github.io/Refuge/index.html`.
+**Ne jamais changer ni `start_url` ni `id`.** Sinon, pour les téléphones où
 Refuge est déjà installée, ce serait une autre application, qui ne recevrait
 plus les mises à jour.

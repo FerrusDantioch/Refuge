@@ -42,7 +42,7 @@ html[data-theme="clair"] {
   --surface-2:   #ebe7df;
   --bord:        #d8d2c7;
   --texte:       #3b4046;
-  --texte-doux:  #6e757d;
+  --texte-doux:  #626870;
   --accent:      #5d8579;
   --accent-fond: #e2ebe6;
   --aide-fond:   #f0dcd2;
@@ -64,7 +64,7 @@ html[data-palette="bleu"][data-theme="sombre"] {
 }
 html[data-palette="bleu"][data-theme="clair"] {
   --bg: #eef0f2; --surface: #f7f8f9; --surface-2: #e9ebee; --bord: #d7dbe0;
-  --texte: #3b4046; --texte-doux: #6e757d; --accent: #4f7086; --accent-fond: #e3eaee;
+  --texte: #3b4046; --texte-doux: #626870; --accent: #4f7086; --accent-fond: #e3eaee;
 }
 html[data-palette="sauge"][data-theme="sombre"] {
   --bg: #161c19; --surface: #1d2621; --surface-2: #25302a; --bord: #354539;
@@ -72,7 +72,7 @@ html[data-palette="sauge"][data-theme="sombre"] {
 }
 html[data-palette="sauge"][data-theme="clair"] {
   --bg: #eef1ec; --surface: #f6f8f4; --surface-2: #e7ebe3; --bord: #d3dbcd;
-  --texte: #384038; --texte-doux: #69756a; --accent: #5d8579; --accent-fond: #e2ebe6;
+  --texte: #384038; --texte-doux: #5f6a60; --accent: #5d8579; --accent-fond: #e2ebe6;
 }
 html[data-palette="lavande"][data-theme="sombre"] {
   --bg: #1a1822; --surface: #221f2d; --surface-2: #2b2839; --bord: #3d3850;
@@ -80,7 +80,7 @@ html[data-palette="lavande"][data-theme="sombre"] {
 }
 html[data-palette="lavande"][data-theme="clair"] {
   --bg: #f1eef5; --surface: #f8f6fa; --surface-2: #eae6f0; --bord: #d8d2e2;
-  --texte: #423d4c; --texte-doux: #756e82; --accent: #7871a8; --accent-fond: #e8e4f0;
+  --texte: #423d4c; --texte-doux: #696376; --accent: #7871a8; --accent-fond: #e8e4f0;
 }
 html[data-palette="sable"][data-theme="sombre"] {
   --bg: #1c1815; --surface: #241f1a; --surface-2: #2e2721; --bord: #453a30;
@@ -88,7 +88,7 @@ html[data-palette="sable"][data-theme="sombre"] {
 }
 html[data-palette="sable"][data-theme="clair"] {
   --bg: #f3ece2; --surface: #faf6f0; --surface-2: #ede4d6; --bord: #ddd0bd;
-  --texte: #453a30; --texte-doux: #7d7062; --accent: #8c6a46; --accent-fond: #f0e6d8;
+  --texte: #453a30; --texte-doux: #706356; --accent: #8c6a46; --accent-fond: #f0e6d8;
 }
 html[data-palette="peche"][data-theme="sombre"] {
   --bg: #1d1816; --surface: #27201d; --surface-2: #312824; --bord: #4a3b34;
@@ -96,7 +96,7 @@ html[data-palette="peche"][data-theme="sombre"] {
 }
 html[data-palette="peche"][data-theme="clair"] {
   --bg: #f7eee8; --surface: #fcf7f3; --surface-2: #f1e5dc; --bord: #e3d1c4;
-  --texte: #4a3a32; --texte-doux: #806c61; --accent: #a47260; --accent-fond: #f5e2d7;
+  --texte: #4a3a32; --texte-doux: #746157; --accent: #a47260; --accent-fond: #f5e2d7;
 }
 html[data-palette="miel"][data-theme="sombre"] {
   --bg: #1c1a15; --surface: #26231c; --surface-2: #302c23; --bord: #484133;
@@ -104,7 +104,7 @@ html[data-palette="miel"][data-theme="sombre"] {
 }
 html[data-palette="miel"][data-theme="clair"] {
   --bg: #f6f1e4; --surface: #fbf8ef; --surface-2: #efe8d6; --bord: #ded3b9;
-  --texte: #463f2e; --texte-doux: #7d735c; --accent: #8a7748; --accent-fond: #f1e9d2;
+  --texte: #463f2e; --texte-doux: #6f6651; --accent: #8a7748; --accent-fond: #f1e9d2;
 }
 html[data-palette="rose"][data-theme="sombre"] {
   --bg: #1d1719; --surface: #271f22; --surface-2: #31272b; --bord: #4a3a40;
@@ -112,7 +112,7 @@ html[data-palette="rose"][data-theme="sombre"] {
 }
 html[data-palette="rose"][data-theme="clair"] {
   --bg: #f6eef0; --surface: #fbf6f7; --surface-2: #efe3e6; --bord: #e0cdd2;
-  --texte: #4a3940; --texte-doux: #806b73; --accent: #a4677a; --accent-fond: #f3e2e7;
+  --texte: #4a3940; --texte-doux: #746068; --accent: #a4677a; --accent-fond: #f3e2e7;
 }
 
 /* Thème BOUCLIER : noir absolu #000 (pixels OLED éteints = batterie
@@ -188,6 +188,9 @@ small { font-size: 0.85rem; color: var(--texte-doux); }
   outline: 3px solid var(--accent);
   outline-offset: 3px;
   border-radius: 8px;
+}
+html[data-bouclier="on"] :focus-visible {
+  outline-color: #5a5a5a;
 }
 
 /* ---------- 3. Mise en page ---------- */
@@ -360,6 +363,7 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  min-height: 60px;
   padding: 14px 0;
   border-bottom: 1px solid var(--bord);
   margin: 0;
@@ -561,10 +565,11 @@ html[data-bouclier="on"] .nouvelle-version { display: none !important; }
 .vide { color: var(--texte-doux); text-align: center; padding: 36px 12px; }
 .masque { display: none !important; }
 
-/* Message d'état annoncé aux lecteurs d'écran */
+/* Message d'état annoncé aux lecteurs d'écran (et titre h1 de l'accueil) */
 .annonce {
   position: absolute; width: 1px; height: 1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  margin: 0; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
 
 /* ============================================================
@@ -681,6 +686,14 @@ html[data-bouclier="on"] .lien button.arme { background: #101010; border-color: 
   border: 2px solid var(--bord);
   display: block;
 }
+.palette-carte[data-palette="refuge"]  .pastille { background: #7ea8a0; }
+.palette-carte[data-palette="bleu"]    .pastille { background: #9dbcd0; }
+.palette-carte[data-palette="sauge"]   .pastille { background: #a5ccb4; }
+.palette-carte[data-palette="lavande"] .pastille { background: #c0b6e6; }
+.palette-carte[data-palette="sable"]   .pastille { background: #b89a7a; }
+.palette-carte[data-palette="peche"]   .pastille { background: #ddb8a3; }
+.palette-carte[data-palette="miel"]    .pastille { background: #d6c19f; }
+.palette-carte[data-palette="rose"]    .pastille { background: #daabb5; }
 .palette-carte[aria-pressed="true"] {
   background: var(--accent-fond);
   border-color: var(--accent);
@@ -725,7 +738,10 @@ html[data-bouclier="on"] .phrases button[aria-pressed="true"] { background: #101
    « Protocole » et « Réglages » tiennent sur un écran étroit,
    sans jamais descendre sous 68 px de hauteur tactile.
    ============================================================ */
-.onglet { font-size: 0.72rem; padding: 8px 2px; gap: 4px; }
+.onglet { font-size: 0.72rem; padding: 8px 2px; gap: 4px; min-width: 0; }
+@media (max-width: 359px) {
+  .onglet { font-size: min(0.72rem, 12px); padding: 8px 1px; }
+}
 .onglet svg { width: 22px; height: 22px; }
 
 /* Note d'installation (section À propos) : inutile une fois l'application
@@ -812,3 +828,46 @@ html[data-bouclier="on"] .smiley-petit { filter: grayscale(1) brightness(0.6); }
 .message-reglage { border-top: 1px solid var(--bord); padding: 12px 0; }
 .message-reglage textarea { min-height: 84px; margin-bottom: 8px; }
 .message-reglage button { width: auto; padding: 10px 16px; font-size: 0.9rem; }
+
+/* ============================================================
+   17. ESPACEMENTS ET ÉTATS (sans style inline pour la CSP)
+   ============================================================ */
+#vue-accueil > .bouton-rangee,
+#vue-accueil > button { margin-bottom: 16px; }
+
+#btn-noter-vite { margin-bottom: 8px; }
+#btn-nouvelle { margin-bottom: 18px; }
+#bilan-texte { margin-bottom: 0; }
+
+#btn-respi { margin-bottom: 20px; }
+#vue-respiration .entree-liens { margin-bottom: 16px; }
+
+.carte h3.sous-titre-carte { margin-top: 18px; }
+#btn-choisir-contact,
+#btn-tester-position,
+#btn-urgences-reglages,
+#vue-reglages a.bouton { margin-bottom: 16px; }
+#r-proche-ajouter,
+#btn-sauvegarder,
+#restaurer-resume { margin-bottom: 12px; }
+#r-emotions-defaut { margin-top: 8px; }
+#restaurer-confirmation,
+#restaurer-message { margin-top: 16px; }
+
+#sos-envoyer,
+#sos-appeler,
+#sos-contraste,
+#monte-respirer,
+#monte-bouclier,
+#carte-telecharger,
+#carte-partager { margin-bottom: 12px; }
+
+#procedure-decocher { margin-top: 16px; }
+#procedure-retour { margin-top: 12px; }
+#proches-retour { margin-top: 4px; }
+
+#btn-creer-carte:disabled { opacity: 0.5; cursor: default; }
+.etiquette-haut-14 { margin-top: 14px; }
+.titre-monte { margin-top: 18px; }
+.btn-ajout-message { margin: 8px 0 16px; }
+.btn-supprimer-contact { margin-bottom: 10px; }
